@@ -1,0 +1,19 @@
+[package]
+name = "forgor"
+# Version will be updated by CI in `release` branch.
+# Avoid modifying version manually or it will break CI
+
+
+version = "0.1.0"
+
+
+edition = "2024"
+
+[lints.clippy]
+new_without_default = "allow"
+
+[dependencies]
+serde = { version = "1.0.228", features = ["derive"] }
+serde_yml = "0.0.12"
+thiserror = "2.0.18"
+tokio = { version = "1.51.1", features = ["macros", "rt-multi-thread", "signal"] }
