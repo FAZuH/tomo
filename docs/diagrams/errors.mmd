@@ -1,0 +1,74 @@
+---
+config:
+  class:
+    hideEmptyMembersBox: true
+---
+classDiagram
+    direction TB
+
+    class Error {
+        <<top-level>>
+        +Cli(CliArgumentError)
+        +Config(ConfigError)
+        +Ui(UiError)
+        +Pomodoro(PomodoroError)
+        +Build(AppBuildError)
+    }
+
+    class CliArgumentError {
+        +EmptyArgument
+        +ParseError(String)
+    }
+
+    class ConfigError {
+        +Io(io::Error)
+        +Serialization(serde_yml::Error)
+    }
+
+    class UiError {
+        +Tui(TuiError)
+        +Pomodoro(PomodoroError)
+        +App(AppError)
+        +Build(AppBuildError)
+    }
+
+    class TuiError {
+        +Io(io::Error)
+    }
+
+    class PomodoroError {
+        +Running
+        +NotRunning
+        +UnexpectedState(String)
+    }
+
+    class AppError {
+        +Pomodoro(PomodoroError)
+    }
+
+    class AppBuildError {
+        +MissingConfig
+        +MissingPomodoro
+        +MissingHomeView
+        +MissingTimerView
+        +MissingSettingsView
+    }
+
+    Error ..> CliArgumentError
+    Error ..> ConfigError
+    Error ..> UiError
+    Error ..> PomodoroError
+    Error ..> AppBuildError
+
+    UiError ..> TuiError
+    UiError ..> PomodoroError
+    UiError ..> AppError
+    UiError ..> AppBuildError
+
+    AppError ..> PomodoroError
+
+    TuiRunner ..> UiError : returns
+
+    App ..> AppError : returns
+
+    TimerController ..> PomodoroError : returns

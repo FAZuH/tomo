@@ -1,0 +1,95 @@
+sequenceDiagram
+    autonumber
+    participant U as User
+    participant TR as TuiRunner
+    participant A as App
+    participant C as Controller
+    participant M as Model
+    participant V as View
+    participant R as TuiRenderer
+
+    rect rgb(30, 40, 55)
+        note right of TR: INITIALIZATION
+        TR->>A: AppBuilder::build()
+        activate A
+        A->>C: new PageController(view, model)
+        activate C
+        C->>M: new Model()
+        activate M
+        M-->>C: model
+        deactivate M
+        C->>V: new TuiView()
+        activate V
+        V-->>C: view
+        deactivate V
+        C-->>A: controller
+        deactivate C
+        A-->>TR: app
+        deactivate A
+    end
+
+    rect rgb(30, 50, 40)
+        note right of TR: MAIN LOOP
+        loop Every tick (100ms)
+            TR->>A: tick()
+            activate A
+            A->>C: tick()
+            activate C
+            C->>M: tick()
+            activate M
+            M-->>C: Ok
+            deactivate M
+            C-->>A: Ok
+            deactivate C
+            A-->>TR: Ok
+            deactivate A
+        end
+    end
+
+    rect rgb(50, 30, 40)
+        note right of TR: INPUT → RENDER CYCLE
+        TR->>TR: poll KeyEvent (100ms timeout)
+        U->>TR: KeyCode::Up
+        TR->>TR: KeyEvent → Input::Up
+        TR->>A: handle(Input::Up)
+        activate A
+        A->>C: handle(TimerViewActions::Add5Min)
+        activate C
+        C->>M: add(5min)
+        activate M
+        M-->>C: Ok
+        deactivate M
+        A-->>V: render(view_state)
+        activate V
+        V-->>C: Vec~TimerRenderCommand~
+        deactivate V
+        C-->>A: Ok(Navigation::Stay)
+        deactivate C
+        A-->>TR: Ok(Navigation::Stay)
+        deactivate A
+
+        TR->>A: render()
+        activate A
+        A-->>TR: Vec~RenderCommand~
+        deactivate A
+
+        TR->>R: flush(frame, commands)
+        activate R
+        R-->>TR: Ok
+        deactivate R
+    end
+
+    rect rgb(50, 30, 40)
+        note right of TR: NAVIGATION
+        U->>TR: KeyCode::Esc (Home page)
+        TR->>TR: KeyEvent → Input::Esc
+        TR->>A: handle(Input::Esc)
+        activate A
+        A->>C: handle(HomeViewActions::Quit)
+        activate C
+        C-->>A: Navigation::Quit
+        deactivate C
+        A-->>TR: Ok(Navigation::Quit)
+        deactivate A
+        TR-->>U: exit
+    end

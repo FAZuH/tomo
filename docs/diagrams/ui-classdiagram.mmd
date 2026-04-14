@@ -1,0 +1,264 @@
+classDiagram
+    direction TB
+
+    class Page {
+        <<enumeration>>
+        Home
+        Timer
+        Settings
+    }
+
+    class Navigation {
+        <<enumeration>>
+        GoTo(Page)
+        Stay
+        Quit
+    }
+
+    class Input {
+        <<enumeration>>
+        Up
+        Down
+        Left
+        Right
+        Enter
+        Esc
+        Backspace
+        Char(char)
+        Ctrl(char)
+        Shift(char)
+    }
+
+    class FromInput {
+        <<trait>>
+        +from_input(Input) Option~Self~
+    }
+
+    class App {
+        -active_page : Page
+        -home : HomeController
+        -timer : TimerController
+        -settings : SettingsController
+        +builder() AppBuilder
+        +handle(input: Input) Result~Navigation, AppError~
+        +tick() Result~void, PomodoroError~
+        +render() Vec~RenderCommand~
+        +navigate(nav: Navigation)
+    }
+
+    class AppBuilder {
+        -config : Option~Config~
+        -pomodoro : Option~Pomodoro~
+        -page : Option~Page~
+        -home_view : Option~Box~dyn HomeView~~
+        -timer_view : Option~Box~dyn TimerView~~
+        -settings_view : Option~Box~dyn SettingsView~~
+        +build() Result~App, AppBuildError~
+    }
+
+    App ..> AppBuilder : creates
+    App --> Page : active_page
+    App *-- HomeController
+    App *-- TimerController
+    App *-- SettingsController
+
+    class HomeController {
+        -view : Box~dyn HomeView~
+        +new(view) HomeController
+        +handle(action: HomeViewActions) Navigation
+        +render() Vec~HomeRenderCommand~
+    }
+
+    class HomeView {
+        <<interface>>
+        +render() Vec~HomeRenderCommand~
+    }
+
+    class TuiHomeView {
+        +render() Vec~HomeRenderCommand~
+    }
+
+    HomeController o-- HomeView : view
+    HomeView <|.. TuiHomeView
+
+    class TimerController {
+        -view : Box~dyn TimerView~
+        -model : Pomodoro
+        +new(view, model) TimerController
+        +handle(action: TimerViewActions) Result~Navigation, PomodoroError~
+        +tick() Result~void, PomodoroError~
+        +render() Vec~TimerRenderCommand~
+    }
+
+    class TimerView {
+        <<interface>>
+        +render(state: TimerViewState) Vec~TimerRenderCommand~
+    }
+
+    class TuiTimerView {
+        +render(state: TimerViewState) Vec~TimerRenderCommand~
+    }
+
+    TimerController *-- Pomodoro : model
+    TimerController o-- TimerView : view
+    TimerView <|.. TuiTimerView
+
+    class SettingsController {
+        -view : Box~dyn SettingsView~
+        -config : Config
+        +new(view, config) SettingsController
+        +render() Vec~SettingsRenderCommand~
+    }
+
+    class SettingsView {
+        <<interface>>
+        +render(state: SettingsViewState) Vec~SettingsRenderCommand~
+    }
+
+    class TuiSettingsView {
+        +render(state: SettingsViewState) Vec~SettingsRenderCommand~
+    }
+
+    SettingsController *-- Config : config
+    SettingsController o-- SettingsView : view
+    SettingsView <|.. TuiSettingsView
+
+    class Pomodoro {
+        +focus : Duration
+        +long_break : Duration
+        +short_break : Duration
+        +state : PomodoroState
+        +running : bool
+        +start() Result~void, PomodoroError~
+        +tick() Result~void, PomodoroError~
+        +toggle_pause()
+        +skip() Result~void, PomodoroError~
+        +reset() Result~void, PomodoroError~
+    }
+
+    class PomodoroState {
+        <<enumeration>>
+        Focus
+        ShortBreak
+        LongBreak
+    }
+
+    Pomodoro ..> PomodoroState : state
+
+    class PomodoroError {
+        <<enumeration>>
+        Running
+        NotRunning
+        UnexpectedState(String)
+    }
+
+    Pomodoro ..> PomodoroError : returns
+
+    class Config {
+        +pomodoro : PomodoroConfig
+        +load() Result~Config, ConfigError~
+        +save() Result~void, ConfigError~
+    }
+
+    class TimerViewState {
+        +remaining : Duration
+        +total : Duration
+        +state : PomodoroState
+        +paused : bool
+    }
+
+    TimerView ..> TimerViewState : reads
+
+    class SettingsViewState {
+        +focus : Duration
+        +short : Duration
+        +long : Duration
+        +long_interval : u32
+    }
+
+    SettingsView ..> SettingsViewState : reads
+
+    class HomeViewActions {
+        <<enumeration>>
+        GoToTimer
+        GoToSettings
+        Quit
+    }
+
+    HomeViewActions ..|> FromInput
+
+    class TimerViewActions {
+        <<enumeration>>
+        Add1Min
+        Add5Min
+        Sub1Min
+        Sub5Min
+        TogglePause
+        SkipSession
+        ResetSession
+        GoHome
+        GoSettings
+        Quit
+    }
+
+    TimerViewActions ..|> FromInput
+
+    class SettingsViewActions {
+        <<enumeration>>
+        EditFocus
+        EditShort
+        EditLong
+        EditLongInterval
+        GoHome
+        GoTimer
+        Quit
+    }
+
+    class RenderCommand {
+        <<enumeration>>
+        Home(Vec~HomeRenderCommand~)
+        Timer(Vec~TimerRenderCommand~)
+        Settings(Vec~SettingsRenderCommand~)
+    }
+
+    class HomeRenderCommand {
+        <<enumeration>>
+        WelcomeText
+        NavButton(String, Page)
+    }
+
+    class TimerRenderCommand {
+        TimerDisplay(remaining: Duration, total: Duration)
+        SessionLabel(state: PomodoroState)
+        PauseIndicator(paused: bool)
+        ProgressBar(progress: f64)
+    }
+
+    class SettingsRenderCommand {
+        <<enumeration>>
+        SettingsHeader
+        SettingsField(label: String, value: String)
+    }
+
+    class TuiRunner {
+        -app : App
+        +new(config, pomodoro) Result~TuiRunner, AppBuildError~
+        +run() Result~void, UiError~
+    }
+
+    TuiRunner *-- App
+
+    class TuiError {
+        <<enumeration>>
+        Io(io::Error)
+    }
+
+    TuiRunner ..> TuiError : io errors
+    TuiRunner ..> Input : translates KeyEvent
+
+    class TuiRenderer {
+        +new() TuiRenderer
+        +flush(frame, commands: Vec~RenderCommand~)
+    }
+
+    TuiRunner ..> TuiRenderer : uses
