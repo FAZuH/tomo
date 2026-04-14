@@ -115,6 +115,7 @@ impl FromInput for HomeViewActions {
             Right => GoToSettings,
             Enter => GoToTimer,
             Esc => Quit,
+            Char('q') => Quit,
             _ => return None,
         };
         Some(ret)
