@@ -14,11 +14,16 @@ pub trait TimerView {
     fn render(&self, state: TimerViewState) -> Vec<TimerRenderCommand>;
 }
 
+#[derive(Clone, Debug, PartialEq)]
 pub struct TimerViewState {
     pub remaining: Duration,
     pub total: Duration,
     pub state: PomodoroState,
-    pub paused: bool,
+    pub running: bool,
+    pub long_interval: u32,
+    pub total_sessions: u32,
+    pub focus_sessions: u32,
+    pub progress_perc: f64,
 }
 
 #[derive(Clone, Debug, Copy, PartialEq, Eq)]
@@ -40,15 +45,40 @@ pub enum TimerViewActions {
     Quit,
 }
 
+impl FromInput for TimerViewActions {
+    fn from_input(input: Input) -> Option<Self> {
+        use Input::*;
+        use TimerViewActions::*;
+        let ret = match input {
+            Left => Sub1Min,
+            Down => Sub5Min,
+            Right => Add1Min,
+            Up => Add5Min,
+            Char(' ') => TogglePause,
+            Enter => SkipSession,
+            Backspace => ResetSession,
+            Char('q') => Quit,
+            _ => return None,
+        };
+        Some(ret)
+    }
+}
+
 #[derive(Clone, Debug, Copy, PartialEq)]
 pub enum TimerRenderCommand {
-    TimerDisplay {
+    State(PomodoroState),
+    Timer {
+        remaining: Duration,
+    },
+    PauseIndicator(bool),
+    Stats {
         remaining: Duration,
         total: Duration,
+        long_interval: u32,
+        total_sessions: u32,
+        focus_sessions: u32,
     },
-    SessionLabel(PomodoroState),
-    PauseIndicator(bool),
-    ProgressBar(f64),
+    Progress(f64),
 }
 
 pub trait SettingsView {
@@ -67,22 +97,4 @@ pub struct SettingsViewState {
 pub enum SettingsRenderCommand {
     SettingsHeader,
     SettingsField { label: String, value: String },
-}
-
-impl FromInput for TimerViewActions {
-    fn from_input(input: Input) -> Option<Self> {
-        use Input::*;
-        use TimerViewActions::*;
-        let ret = match input {
-            Left => Sub1Min,
-            Down => Sub5Min,
-            Right => Add1Min,
-            Up => Add5Min,
-            Char(' ') => TogglePause,
-            Backspace => ResetSession,
-            Enter => SkipSession,
-            _ => return None,
-        };
-        Some(ret)
-    }
 }

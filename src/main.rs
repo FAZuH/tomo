@@ -20,7 +20,8 @@ fn main() -> Result<(), Error> {
     let cli = Cli::parse();
     let conf = Config::load()?;
 
-    let model = create_model(&cli, &conf);
+    let mut model = create_model(&cli, &conf);
+    model.start().unwrap();
     let mut runner = TuiRunner::new(conf, model)?;
     runner.run()?;
 

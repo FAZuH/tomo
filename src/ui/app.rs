@@ -39,8 +39,9 @@ impl App {
         }
     }
 
-    pub fn tick(&mut self) -> Result<(), PomodoroError> {
-        self.timer.tick()
+    pub fn tick(&mut self) -> Result<(), AppError> {
+        self.timer.tick();
+        Ok(())
     }
 
     pub fn render(&self) -> Vec<RenderCommand> {
