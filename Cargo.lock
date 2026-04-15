@@ -507,20 +507,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "77ce24cb58228fbb8aa041425bb1050850ac19177686ea6e0f41a70416f56fdb"
 
 [[package]]
-name = "forgor"
-version = "0.1.0"
-dependencies = [
- "clap",
- "crossterm",
- "figlet-rs",
- "ratatui",
- "serde",
- "serde_yml",
- "thiserror 2.0.18",
- "tokio",
-]
-
-[[package]]
 name = "generic-array"
 version = "0.14.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1578,6 +1564,20 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.117",
+]
+
+[[package]]
+name = "tomo"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "crossterm",
+ "figlet-rs",
+ "ratatui",
+ "serde",
+ "serde_yml",
+ "thiserror 2.0.18",
+ "tokio",
 ]
 
 [[package]]
