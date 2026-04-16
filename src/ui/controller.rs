@@ -70,36 +70,25 @@ impl From<&Pomodoro> for TimerViewState {
 pub struct SettingsController {
     view: Box<dyn SettingsView>,
     config: Config,
+    curr_selection_idx: u32,
 }
 
 impl SettingsController {
     pub fn new(view: Box<dyn SettingsView>, config: Config) -> Self {
-        Self { view, config }
+        Self {
+            view,
+            config,
+            curr_selection_idx: 0,
+        }
     }
 
     pub fn handle(&mut self, action: SettingsViewActions) -> Result<Navigation, PomodoroError> {
         use SettingsViewActions::*;
-        let timer = &mut self.config.pomodoro.timer;
-        let hook = &mut self.config.pomodoro.hook;
-        let sound = &mut self.config.pomodoro.sound;
         match action {
-            TimerFocus(duration) => timer.focus = duration,
-            TimerShort(duration) => timer.short = duration,
-            TimerLong(duration) => timer.long = duration,
-            TimerLongInterval(interval) => timer.long_interval = interval,
-            TimerAutoFocus(auto) => timer.auto_focus = auto,
-            TimerAutoShort(auto) => timer.auto_short = auto,
-            TimerAutoLong(auto) => timer.auto_long = auto,
-
-            HookFocus(cmd) => hook.focus = Self::split_cmd(cmd),
-            HookShort(cmd) => hook.short = Self::split_cmd(cmd),
-            HookLong(cmd) => hook.long = Self::split_cmd(cmd),
-
-            SoundFocus(path) => sound.focus = path,
-            SoundShort(path) => sound.short = path,
-            SoundLong(path) => sound.long = path,
-
-            GoTo(page) => return Ok(Navigation::GoTo(page)),
+            SelectDown => self.curr_selection_idx -= 1,
+            SelectUp => self.curr_selection_idx += 1,
+            EditSelection => todo!(),
+            Navigate(nav) => return Ok(nav),
         }
         Ok(Navigation::Stay)
     }

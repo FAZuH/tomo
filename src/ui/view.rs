@@ -4,6 +4,7 @@ use std::time::Duration;
 use crate::models::pomodoro::PomodoroState;
 use crate::ui::FromInput;
 use crate::ui::Input;
+use crate::ui::Navigation;
 use crate::ui::Page;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -106,23 +107,11 @@ pub struct SettingsViewState {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SettingsViewActions {
-    TimerFocus(Duration),
-    TimerShort(Duration),
-    TimerLong(Duration),
-    TimerLongInterval(u32),
-    TimerAutoFocus(bool),
-    TimerAutoShort(bool),
-    TimerAutoLong(bool),
+    SelectDown,
+    SelectUp,
+    EditSelection,
 
-    HookFocus(String),
-    HookShort(String),
-    HookLong(String),
-
-    SoundFocus(Option<PathBuf>),
-    SoundShort(Option<PathBuf>),
-    SoundLong(Option<PathBuf>),
-
-    GoTo(Page),
+    Navigate(Navigation),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
