@@ -108,20 +108,27 @@ impl SettingsController {
         let state = SettingsViewState::from(&self.config);
         self.view.render(state)
     }
-
-    fn split_cmd(cmd: String) -> Vec<String> {
-        cmd.split_whitespace().map(str::to_owned).collect::<Vec<String>>()
-    }
 }
 
 impl From<&Config> for SettingsViewState {
     fn from(value: &Config) -> Self {
         let timer = value.pomodoro.timer.clone();
+        let hook = value.pomodoro.hook.clone();
+        let sound = value.pomodoro.sound.clone();
         Self {
             timer_focus: timer.focus,
             timer_short: timer.short,
             timer_long: timer.long,
             timer_long_interval: timer.long_interval,
+            timer_auto_focus: timer.auto_focus,
+            timer_auto_short: timer.auto_short,
+            timer_auto_long: timer.auto_long,
+            hook_focus: hook.focus,
+            hook_short: hook.short,
+            hook_long: hook.long,
+            sound_focus: sound.focus,
+            sound_short: sound.short,
+            sound_long: sound.long,
         }
     }
 }
