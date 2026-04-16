@@ -1,0 +1,73 @@
+sequenceDiagram
+    autonumber
+    participant U as User
+    participant App as App
+    participant C as Controller
+    participant M as Model
+    participant V as View
+
+    rect rgb(180, 200, 220)
+        note right of App: INITIALIZATION
+        App->>App: AppBuilder::build()
+        activate App
+        App->>C: new PageController(view, model)
+        activate C
+        C->>M: new Model()
+        activate M
+        M-->>C: model
+        deactivate M
+        C->>V: new View()
+        activate V
+        V-->>C: view
+        deactivate V
+        C-->>App: controller
+        deactivate C
+        App-->>App: app
+        deactivate App
+    end
+
+    rect rgb(180, 220, 190)
+        note right of App: TICK CYCLE
+        loop Every tick
+            App->>C: tick()
+            activate C
+            C->>M: updates models
+            activate M
+            M-->>C: Ok
+            deactivate M
+            C-->>App: Ok
+            deactivate C
+        end
+    end
+
+    rect rgb(220, 180, 190)
+        note right of App: INPUT → RENDER CYCLE
+        U->>App: Input event
+        App->>C: handle(action)
+        activate C
+        C->>M: mutate state
+        activate M
+        M-->>C: Ok
+        deactivate M
+        C-->>App: Ok(Navigation)
+        deactivate C
+
+        App->>C: render()
+        activate C
+        C->>V: render(view_state)
+        activate V
+        V-->>C: Vec~RenderCommand~
+        deactivate V
+        C-->>App: Vec~RenderCommand~
+        deactivate C
+    end
+
+    rect rgb(220, 180, 190)
+        note right of App: NAVIGATION
+        U->>App: Input (navigation)
+        App->>C: handle(action)
+        activate C
+        C-->>App: Ok(Navigation::GoTo(Page))
+        deactivate C
+        App->>App: navigate(Navigation)
+    end

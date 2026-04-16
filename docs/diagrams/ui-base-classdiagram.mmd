@@ -1,0 +1,254 @@
+---
+config:
+    class:
+        hideEmptyMembersBox: true
+---
+classDiagram
+    direction TD
+
+    class Page:::action {
+        <<enumeration>>
+        Timer
+        Settings
+    }
+
+    class Navigation:::action {
+        <<enumeration>>
+        GoTo(Page)
+        Stay
+        Quit
+    }
+
+    class Input:::action {
+        <<enumeration>>
+        Up
+        Down
+        Left
+        Right
+        Enter
+        Esc
+        Backspace
+        Char(char)
+        Ctrl(char)
+        Shift(char)
+    }
+
+    class FromInput:::action {
+        <<trait>>
+        +from_input(Input) Option~Self~
+    }
+
+    class App:::controller {
+        -active_page : Page
+        -timer : TimerController
+        -settings : SettingsController
+        +builder() AppBuilder
+        +handle(input: Input) Result~Navigation, AppError~
+        +tick() Result~void, AppError~
+        +render() Vec~RenderCommand~
+        +navigate(nav: Navigation)
+    }
+
+    class AppBuilder:::controller {
+        -config : Option~Config~
+        -pomodoro : Option~Pomodoro~
+        -page : Option~Page~
+        -timer_view : Option~Box~dyn TimerView~~
+        -settings_view : Option~Box~dyn SettingsView~~
+        +build() Result~App, AppBuildError~
+    }
+
+    App ..> AppBuilder : creates
+    App --> Page : active_page
+    App *-- TimerController
+    App *-- SettingsController
+    App --> Navigation : navigates
+    App --> Input : handles
+    App --> RenderCommand : creates
+
+    namespace Timer {
+        class TimerController:::controller {
+            -view : Box~dyn TimerView~
+            -model : Pomodoro
+            +new(view, model) TimerController
+            +handle(action: TimerViewActions) Result~Navigation, PomodoroError~
+            +tick()
+            +render() Vec~TimerRenderCommand~
+        }
+
+        class TimerView:::view {
+            <<interface>>
+            +render(state: TimerViewState) Vec~TimerRenderCommand~
+        }
+
+        class TimerViewState:::state {
+            +remaining : Duration
+            +total : Duration
+            +state : PomodoroState
+            +running : bool
+            +long_interval : u32
+            +total_sessions : u32
+            +focus_sessions : u32
+            +progress_perc : f64
+        }
+
+        class TimerViewActions:::action {
+            <<enumeration>>
+            Add30Sec
+            Add1Min
+            Sub30Sec
+            Sub1Min
+            TogglePause
+            SkipSession
+            ResetSession
+            GoSettings
+            Quit
+        }
+
+        class TimerRenderCommand:::renderCmd {
+            <<enumeration>>
+            State(PomodoroState)
+            Timer(remaining: Duration)
+            PauseIndicator(bool)
+            Stats(remaining, total, long_interval, total_sessions, focus_sessions)
+            Progress(f64)
+        }
+    }
+
+    namespace Model {
+        class Pomodoro:::model {
+            +focus : Duration
+            +long_break : Duration
+            +short_break : Duration
+            +state : PomodoroState
+            +running : bool
+            +start() Result~void, PomodoroError~
+            +tick() Result~void, PomodoroError~
+            +toggle_pause()
+            +skip() Result~void, PomodoroError~
+            +reset() Result~void, PomodoroError~
+            +add(Duration)
+            +subtract(Duration)
+        }
+
+        class PomodoroState:::state {
+            <<enumeration>>
+            Focus
+            ShortBreak
+            LongBreak
+        }
+
+        class PomodoroError:::error {
+            <<enumeration>>
+            Running
+            NotRunning
+            UnexpectedState(String)
+        }
+
+        class Config:::model {
+            +pomodoro : PomodoroConfig
+            +load() Result~Config, ConfigError~
+            +save() Result~void, ConfigError~
+        }
+    }
+
+    namespace Settings {
+        class SettingsController:::controller {
+            -view : Box~dyn SettingsView~
+            -config : Config
+            +new(view, config) SettingsController
+            +handle(action: SettingsViewActions) Result~Navigation, PomodoroError~
+            +render() Vec~SettingsRenderCommand~
+        }
+
+        class SettingsView:::view {
+            <<interface>>
+            +render(state: SettingsViewState) Vec~SettingsRenderCommand~
+        }
+
+        class SettingsViewState:::state {
+            +timer_focus : Duration
+            +timer_short : Duration
+            +timer_long : Duration
+            +timer_long_interval : u32
+            +timer_auto_focus : bool
+            +timer_auto_short : bool
+            +timer_auto_long : bool
+            +hook_focus : String
+            +hook_short : String
+            +hook_long : String
+            +sound_focus : Option~PathBuf~
+            +sound_short : Option~PathBuf~
+            +sound_long : Option~PathBuf~
+        }
+
+        class SettingsViewActions:::action {
+            <<enumeration>>
+            TimerFocus(Duration)
+            TimerShort(Duration)
+            TimerLong(Duration)
+            TimerLongInterval(u32)
+            TimerAutoFocus(bool)
+            TimerAutoShort(bool)
+            TimerAutoLong(bool)
+            HookFocus(String)
+            HookShort(String)
+            HookLong(String)
+            SoundFocus(Option~PathBuf~)
+            SoundShort(Option~PathBuf~)
+            SoundLong(Option~PathBuf~)
+            GoTo(Page)
+        }
+
+        class SectionLayout:::renderCmd {
+            <<enumeration>>
+            Vertical
+            Horizontal
+        }
+
+        class SettingsRenderCommand:::renderCmd {
+            <<enumeration>>
+            Title
+            Section(label: String, children: Vec~Self~)
+            SubSection(label: String, layout: SectionLayout, children: Vec~Self~)
+            Input(label: String, value: String)
+            Checkbox(label: String, value: bool)
+        }
+    }
+
+    class RenderCommand:::renderCmd {
+        <<enumeration>>
+        Timer(Vec~TimerRenderCommand~)
+        Settings(Vec~SettingsRenderCommand~)
+    }
+
+    TimerController --> TimerRenderCommand : returns to App
+    TimerView --> TimerRenderCommand : creates
+    TimerController --> TimerViewActions : handles
+
+    SettingsController --> SettingsRenderCommand : returns to App
+    SettingsView --> SettingsRenderCommand : creates
+    SettingsController --> SettingsViewActions : handles
+    SettingsRenderCommand --> SectionLayout : layout
+
+    TimerController *-- Pomodoro : model
+    TimerController o-- TimerView : calls render()
+
+    SettingsController *-- Config : config
+    SettingsController o-- SettingsView : calls render()
+
+    Pomodoro ..> PomodoroState : state
+    Pomodoro ..> PomodoroError : returns
+
+    TimerView ..> TimerViewState : reads
+    SettingsView ..> SettingsViewState : reads
+
+    TimerViewActions ..|> FromInput
+
+    classDef view fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px,color:#000
+    classDef controller fill:#bbdefb,stroke:#1565c0,stroke-width:2px,color:#000
+    classDef state fill:#fff9c4,stroke:#fbc02d,stroke-width:2px,color:#000
+    classDef renderCmd fill:#ffccbc,stroke:#d84315,stroke-width:2px,color:#000
+    classDef model fill:#e1bee7,stroke:#6a1b9a,stroke-width:2px,color:#000
+    classDef action fill:#cfd8dc,stroke:#455a64,stroke-width:2px,color:#000
+    classDef error fill:#ffcdd2,stroke:#c62828,stroke-width:2px,color:#000
