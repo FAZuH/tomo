@@ -1,7 +1,5 @@
 use crate::cli::CliArgumentError;
 use crate::config::ConfigError;
-use crate::models::pomodoro::PomodoroError;
-use crate::ui::app::AppBuildError;
 use crate::ui::error::UiError;
 
 #[derive(Debug, thiserror::Error)]
@@ -15,11 +13,8 @@ pub enum Error {
     #[error(transparent)]
     Ui(#[from] UiError),
 
-    #[error(transparent)]
-    Pomodoro(#[from] PomodoroError),
-
-    #[error(transparent)]
-    Build(#[from] AppBuildError),
+    #[error("Invalid state: {0}")]
+    InvalidState(String),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

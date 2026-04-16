@@ -22,8 +22,8 @@ fn main() -> Result<(), Error> {
 
     let mut model = create_model(&cli, &conf);
     model.start().unwrap();
-    let mut runner = TuiRunner::new(conf, model)?;
-    runner.run()?;
+    let mut runner = TuiRunner::new(conf, model).unwrap();
+    runner.run().unwrap();
 
     Ok(())
 }

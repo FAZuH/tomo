@@ -1,3 +1,4 @@
+use std::thread::sleep;
 use std::time::Duration;
 
 use crossterm::event::Event;
@@ -18,7 +19,6 @@ use crate::ui::Input;
 use crate::ui::Navigation;
 use crate::ui::app::App;
 use crate::ui::app::AppBuildError;
-use crate::ui::error::UiError;
 use crate::ui::tui::TuiError;
 use crate::ui::tui::renderer::TuiRenderer;
 use crate::ui::tui::view::TuiSettingsView;
@@ -40,15 +40,15 @@ impl TuiRunner {
         Ok(Self { app })
     }
 
-    pub fn run(&mut self) -> Result<(), UiError> {
+    pub fn run(&mut self) -> Result<(), TuiError> {
         enable_raw_mode().map_err(TuiError::from)?;
         let mut stdout = std::io::stdout();
         execute!(stdout, EnterAlternateScreen).map_err(TuiError::from)?;
         let mut terminal = Terminal::new(CrosstermBackend::new(stdout)).map_err(TuiError::from)?;
 
-        let renderer = TuiRenderer::new();
+        let mut renderer = TuiRenderer::new();
 
-        let res = self.run_loop(&mut terminal, &renderer);
+        let res = self.run_loop(&mut terminal, &mut renderer);
 
         // Unconditionally ignore errors for cleanup
         let _ = disable_raw_mode();
@@ -61,8 +61,8 @@ impl TuiRunner {
     fn run_loop(
         &mut self,
         terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
-        renderer: &TuiRenderer,
-    ) -> Result<(), UiError> {
+        renderer: &mut TuiRenderer,
+    ) -> Result<(), TuiError> {
         loop {
             self.app.tick()?;
             let cmds = self.app.render();
@@ -81,6 +81,7 @@ impl TuiRunner {
                     }
                 }
             }
+            sleep(Duration::from_millis(100));
         }
         Ok(())
     }

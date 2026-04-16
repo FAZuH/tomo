@@ -4,15 +4,12 @@ config:
     hideEmptyMembersBox: true
 ---
 classDiagram
-    direction TB
+    direction TD
 
     class Error {
-        <<top-level>>
         +Cli(CliArgumentError)
         +Config(ConfigError)
         +Ui(UiError)
-        +Pomodoro(PomodoroError)
-        +Build(AppBuildError)
     }
 
     class CliArgumentError {
@@ -27,7 +24,6 @@ classDiagram
 
     class UiError {
         +Tui(TuiError)
-        +Pomodoro(PomodoroError)
         +App(AppError)
         +Build(AppBuildError)
     }
@@ -57,18 +53,11 @@ classDiagram
     Error ..> CliArgumentError
     Error ..> ConfigError
     Error ..> UiError
-    Error ..> PomodoroError
-    Error ..> AppBuildError
 
     UiError ..> TuiError
-    UiError ..> PomodoroError
     UiError ..> AppError
     UiError ..> AppBuildError
 
+    TuiError ..> AppError
+
     AppError ..> PomodoroError
-
-    TuiRunner ..> UiError : returns
-
-    App ..> AppError : returns
-
-    TimerController ..> PomodoroError : returns

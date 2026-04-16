@@ -1,0 +1,69 @@
+---
+config:
+  class:
+    hideEmptyMembersBox: true
+---
+classDiagram
+    direction TD
+
+    namespace Runner {
+        class TuiRunner {
+            -app : App
+            +new(config, pomodoro) Result~Self, AppBuildError~
+            +run() Result~void, UiError~
+            -run_loop(terminal, renderer) Result~void, UiError~
+        }
+
+        class TuiError {
+            <<enumeration>>
+            Io(io::Error)
+        }
+    }
+
+    namespace Renderer {
+        class TuiRenderer {
+            +flush(frame, commands: Vec~RenderCommand~)
+        }
+
+        class TuiTimerRenderer {
+            -render(frame, cmds: Vec~TimerRenderCommand~)
+        }
+
+        class TuiSettingsRenderer {
+            -render(frame, cmds: Vec~SettingsRenderCommand~)
+        }
+
+        class RenderRow {
+            <<enumeration>>
+            Title
+            Blank
+            SectionHeader(label: String)
+            SubSectionHeader(label: String)
+            Input(label: String, value: String)
+            Checkbox(label: String, value: bool)
+            +height() u16
+        }
+    }
+
+    namespace View {
+        class TuiTimerView {
+            +new() Self
+        }
+
+        class TuiSettingsView {
+            +new() Self
+        }
+    }
+
+    TuiRunner *-- App : app
+    App *-- TuiTimerView
+    App *-- TuiSettingsView
+    TuiRunner ..> TuiRenderer : creates & uses
+
+    TuiRenderer *-- TuiTimerRenderer
+    TuiRenderer *-- TuiSettingsRenderer
+
+    TuiSettingsRenderer ..> RenderRow : flattens commands into
+
+    TuiTimerView ..|> TimerView : implements
+    TuiSettingsView ..|> SettingsView : implements

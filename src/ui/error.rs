@@ -1,4 +1,3 @@
-use crate::models::pomodoro::PomodoroError;
 use crate::ui::app::AppBuildError;
 use crate::ui::app::AppError;
 use crate::ui::tui::TuiError;
@@ -7,9 +6,6 @@ use crate::ui::tui::TuiError;
 pub enum UiError {
     #[error(transparent)]
     Tui(#[from] TuiError),
-
-    #[error(transparent)]
-    Pomodoro(#[from] PomodoroError),
 
     #[error(transparent)]
     App(#[from] AppError),

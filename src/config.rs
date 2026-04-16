@@ -73,9 +73,9 @@ pub struct PomodoroTimerConfig {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct PomodoroHookConfig {
-    pub focus: Vec<String>,
-    pub short: Vec<String>,
-    pub long: Vec<String>,
+    pub focus: String,
+    pub short: String,
+    pub long: String,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

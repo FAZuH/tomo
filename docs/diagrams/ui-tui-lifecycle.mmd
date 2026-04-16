@@ -1,0 +1,121 @@
+sequenceDiagram
+    autonumber
+    participant U as User
+    participant TR as TuiRunner
+    participant A as App
+    participant TC as TimerController
+    participant SC as SettingsController
+    participant TV as TuiTimerView
+    participant SV as TuiSettingsView
+    participant TRen as TuiRenderer
+
+    rect rgb(30, 40, 55)
+        note right of TR: INITIALIZATION
+        TR->>TR: enable_raw_mode() + EnterAlternateScreen
+        TR->>TR: Terminal::new(CrosstermBackend)
+        TR->>TRen: TuiRenderer::new()
+        activate TRen
+        Note over TRen: Creates TuiTimerRenderer + TuiSettingsRenderer
+        TRen-->>TR: renderer
+    end
+
+    rect rgb(30, 50, 40)
+        note right of TR: MAIN LOOP (100ms tick)
+        loop Until Quit
+            TR->>A: tick()
+            activate A
+            A->>TC: tick()
+            activate TC
+            TC->>TC: model.update()
+            TC-->>A: Ok
+            deactivate TC
+            A-->>TR: Ok
+            deactivate A
+
+            TR->>A: render()
+            activate A
+            alt Page::Timer
+                A->>TC: render()
+                activate TC
+                TC->>TV: render(TimerViewState)
+                activate TV
+                TV-->>TC: Vec~TimerRenderCommand~
+                deactivate TV
+                TC-->>A: Vec~TimerRenderCommand~
+                deactivate TC
+                A-->>TR: RenderCommand::Timer(cmds)
+            else Page::Settings
+                A->>SC: render()
+                activate SC
+                SC->>SV: render(SettingsViewState)
+                activate SV
+                SV-->>SC: Vec~SettingsRenderCommand~
+                deactivate SV
+                SC-->>A: Vec~SettingsRenderCommand~
+                deactivate SC
+                A-->>TR: RenderCommand::Settings(cmds)
+            end
+            deactivate A
+
+            TR->>TRen: flush(frame, commands)
+            activate TRen
+            alt Timer commands
+                TRen->>TRen: TuiTimerRenderer::render(frame, cmds)
+                Note over TRen: Layout splits frame.area() then renders state, timer, progress_bar, stats, shortcuts
+            else Settings commands
+                TRen->>TRen: TuiSettingsRenderer::render(frame, cmds)
+                Note over TRen: Flatten cmds → RenderRow list, create ScrollView, render BigText title + sections, show scrollbar if needed
+            end
+            TRen-->>TR: frame drawn
+            deactivate TRen
+
+            TR->>TR: terminal.draw()
+        end
+    end
+
+    rect rgb(50, 30, 40)
+        note right of TR: INPUT HANDLING
+        TR->>TR: poll KeyEvent (100ms)
+        U->>TR: Key press
+        TR->>TR: KeyEvent → Input
+
+        alt Timer page input
+            TR->>A: handle(Input)
+            activate A
+            A->>TC: handle(TimerViewActions)
+            activate TC
+            alt Navigation action
+                TC-->>A: Ok(Navigation::GoTo(Settings) or Quit)
+            else State mutation
+                TC->>TC: model.mutate()
+                TC-->>A: Ok(Navigation::Stay)
+            end
+            deactivate TC
+            A-->>TR: Ok(Navigation)
+            deactivate A
+        else Settings page input
+            TR->>A: handle(Input)
+            activate A
+            A->>SC: handle(SettingsViewActions)
+            activate SC
+            SC->>SC: config.mutate()
+            SC-->>A: Ok(Navigation)
+            deactivate SC
+            A-->>TR: Ok(Navigation)
+            deactivate A
+        end
+
+        alt Navigation::Quit
+            TR-->>TR: break loop
+        else Navigation::GoTo(page)
+            TR->>A: navigate(nav)
+            A->>A: active_page = page
+        end
+    end
+
+    rect rgb(40, 40, 55)
+        note right of TR: CLEANUP
+        TR->>TR: disable_raw_mode()
+        TR->>TR: LeaveAlternateScreen
+        TR->>TR: show_cursor()
+    end

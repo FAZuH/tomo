@@ -1,8 +1,11 @@
+use std::path::PathBuf;
 use std::time::Duration;
 
 use crate::models::pomodoro::PomodoroState;
 use crate::ui::FromInput;
 use crate::ui::Input;
+use crate::ui::Navigation;
+use crate::ui::Page;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum RenderCommand {
@@ -29,12 +32,12 @@ pub struct TimerViewState {
 #[derive(Clone, Debug, Copy, PartialEq, Eq)]
 pub enum TimerViewActions {
     // forward
+    Add30Sec,
     Add1Min,
-    Add5Min,
 
     // backward
+    Sub30Sec,
     Sub1Min,
-    Sub5Min,
 
     // session
     TogglePause,
@@ -50,10 +53,10 @@ impl FromInput for TimerViewActions {
         use Input::*;
         use TimerViewActions::*;
         let ret = match input {
-            Left => Sub1Min,
-            Down => Sub5Min,
-            Right => Add1Min,
-            Up => Add5Min,
+            Left => Sub30Sec,
+            Down => Sub1Min,
+            Right => Add30Sec,
+            Up => Add1Min,
             Char(' ') => TogglePause,
             Enter => SkipSession,
             Backspace => ResetSession,
@@ -87,14 +90,115 @@ pub trait SettingsView {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SettingsViewState {
-    pub focus: Duration,
-    pub short: Duration,
-    pub long: Duration,
-    pub long_interval: u32,
+    pub timer_focus: Duration,
+    pub timer_short: Duration,
+    pub timer_long: Duration,
+    pub timer_long_interval: u32,
+    pub timer_auto_focus: bool,
+    pub timer_auto_short: bool,
+    pub timer_auto_long: bool,
+    pub hook_focus: String,
+    pub hook_short: String,
+    pub hook_long: String,
+    pub sound_focus: Option<PathBuf>,
+    pub sound_short: Option<PathBuf>,
+    pub sound_long: Option<PathBuf>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum SettingsViewActions {
+    SelectDown,
+    SelectUp,
+    EditSelection,
+
+    Navigate(Navigation),
+}
+
+impl FromInput for SettingsViewActions {
+    fn from_input(input: Input) -> Option<Self> {
+        use Input::*;
+        use SettingsViewActions::*;
+        let ret = match input {
+            Up => SelectUp,
+            Down => SelectDown,
+            Enter => EditSelection,
+            Esc => Navigate(Navigation::GoTo(Page::Timer)),
+            Backspace => todo!(),
+            Char(char) => match char {
+                'j' => SelectDown,
+                'k' => SelectUp,
+                'q' => Navigate(Navigation::Quit),
+                _ => return None,
+            },
+            _ => return None,
+        };
+        Some(ret)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum SectionLayout {
+    Vertical,
+    Horizontal,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SettingsRenderCommand {
-    SettingsHeader,
-    SettingsField { label: String, value: String },
+    Title,
+    Section {
+        label: String,
+        children: Vec<Self>,
+    },
+    SubSection {
+        label: String,
+        layout: SectionLayout,
+        children: Vec<Self>,
+    },
+    Input {
+        label: String,
+        value: String,
+    },
+    Checkbox {
+        label: String,
+        value: bool,
+    },
+}
+
+impl SettingsRenderCommand {
+    pub fn section(label: impl ToString, children: Vec<Self>) -> Self {
+        Self::Section {
+            label: label.to_string(),
+            children,
+        }
+    }
+
+    pub fn subsection(label: impl ToString, children: Vec<Self>) -> Self {
+        Self::SubSection {
+            label: label.to_string(),
+            layout: SectionLayout::Vertical,
+            children,
+        }
+    }
+
+    pub fn subsection_horizontal(label: impl ToString, children: Vec<Self>) -> Self {
+        Self::SubSection {
+            label: label.to_string(),
+            layout: SectionLayout::Horizontal,
+            children,
+        }
+    }
+
+    pub fn input(label: impl ToString, value: impl ToString) -> Self {
+        Self::Input {
+            label: label.to_string(),
+            value: value.to_string(),
+        }
+    }
+
+    pub fn checkbox(label: impl ToString, value: bool) -> Self {
+        Self::Checkbox {
+            label: label.to_string(),
+            value,
+        }
+    }
 }
