@@ -85,8 +85,8 @@ impl SettingsController {
     pub fn handle(&mut self, action: SettingsViewActions) -> Result<Navigation, PomodoroError> {
         use SettingsViewActions::*;
         match action {
-            SelectDown => self.curr_selection_idx -= 1,
-            SelectUp => self.curr_selection_idx += 1,
+            SelectDown => self.curr_selection_idx += 1,
+            SelectUp => self.curr_selection_idx -= 1,
             EditSelection => todo!(),
             Navigate(nav) => return Ok(nav),
         }

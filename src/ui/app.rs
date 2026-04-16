@@ -9,6 +9,7 @@ use crate::ui::controller::SettingsController;
 use crate::ui::controller::TimerController;
 use crate::ui::view::RenderCommand;
 use crate::ui::view::SettingsView;
+use crate::ui::view::SettingsViewActions;
 use crate::ui::view::TimerView;
 use crate::ui::view::TimerViewActions;
 
@@ -29,7 +30,10 @@ impl App {
                 Some(action) => Ok(self.timer.handle(action)?),
                 None => Ok(Navigation::Stay),
             },
-            Page::Settings => todo!(),
+            Page::Settings => match SettingsViewActions::from_input(input) {
+                Some(action) => Ok(self.settings.handle(action)?),
+                None => Ok(Navigation::Stay),
+            },
         }
     }
 

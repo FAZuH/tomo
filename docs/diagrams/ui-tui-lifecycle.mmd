@@ -9,7 +9,7 @@ sequenceDiagram
     participant SV as TuiSettingsView
     participant TRen as TuiRenderer
 
-    rect rgb(30, 40, 55)
+    rect rgb(180, 200, 220)
         note right of TR: INITIALIZATION
         TR->>TR: enable_raw_mode() + EnterAlternateScreen
         TR->>TR: Terminal::new(CrosstermBackend)
@@ -19,7 +19,7 @@ sequenceDiagram
         TRen-->>TR: renderer
     end
 
-    rect rgb(30, 50, 40)
+    rect rgb(180, 220, 190)
         note right of TR: MAIN LOOP (100ms tick)
         loop Until Quit
             TR->>A: tick()
@@ -73,7 +73,7 @@ sequenceDiagram
         end
     end
 
-    rect rgb(50, 30, 40)
+    rect rgb(220, 180, 190)
         note right of TR: INPUT HANDLING
         TR->>TR: poll KeyEvent (100ms)
         U->>TR: Key press
@@ -113,7 +113,7 @@ sequenceDiagram
         end
     end
 
-    rect rgb(40, 40, 55)
+    rect rgb(220, 180, 190)
         note right of TR: CLEANUP
         TR->>TR: disable_raw_mode()
         TR->>TR: LeaveAlternateScreen

@@ -38,6 +38,7 @@ jobs:
           pre-commit: ./.github/.pre-commit.js
           config-file-path: ./.github/.config.js
           version-file: ./version.json
+          preset: conventionalcommits
           skip-version-file: true
           skip-git-pull: true
           skip-on-empty: false
