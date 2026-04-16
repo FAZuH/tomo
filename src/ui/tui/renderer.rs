@@ -14,9 +14,21 @@ use crate::ui::view::SettingsRenderCommand;
 use crate::ui::view::TimerRenderCommand;
 use crate::utils;
 
-struct TuiTimerRenderer;
+struct TuiTimerRenderer {
+    layout: Layout,
+    paused_p: Paragraph<'static>,
+    paused_p_length: u16,
+}
 
 impl TuiTimerRenderer {
+    pub fn new() -> Self {
+        let (paused_p, paused_p_length) = Self::paused_paragraph();
+        Self {
+            layout: Self::layout(), 
+            paused_p,
+            paused_p_length,
+        }
+    }
     fn render(&self, frame: &mut Frame, cmds: Vec<TimerRenderCommand>) {
         let mut state = None;
         let mut timer = None;
@@ -24,32 +36,21 @@ impl TuiTimerRenderer {
         let mut stats = None;
         let mut progress = 0.0;
 
+        use TimerRenderCommand::*;
         for cmd in &cmds {
             match cmd {
-                TimerRenderCommand::State(s) => state = Some(*s),
-                TimerRenderCommand::Timer { remaining: r } => timer = Some(*r),
-                TimerRenderCommand::Progress(p) => progress = *p,
-                TimerRenderCommand::PauseIndicator(p) => pause_indicator = *p,
-                TimerRenderCommand::Stats { .. } => stats = Some(cmd.clone()),
+                State(s) => state = Some(*s),
+                Timer { remaining: r } => timer = Some(*r),
+                Progress(p) => progress = *p,
+                PauseIndicator(p) => pause_indicator = *p,
+                Stats { .. } => stats = Some(cmd.clone()),
             }
         }
 
-        let rows = Layout::vertical([
-            Constraint::Fill(1),
-            Constraint::Length(3),
-            Constraint::Length(2),
-            Constraint::Length(9),
-            Constraint::Length(1),
-            Constraint::Length(1),
-            Constraint::Length(1),
-            Constraint::Length(1),
-            Constraint::Length(1),
-            Constraint::Fill(1),
-        ])
-        .split(frame.area());
+        let rows = self.layout.split(frame.area());
 
         if let Some(state) = state {
-            self.session_label(frame, rows[1], state, pause_indicator);
+            self.state(frame, rows[1], state, pause_indicator);
         }
 
         if let Some(remaining) = timer {
@@ -68,7 +69,7 @@ impl TuiTimerRenderer {
             state.map(session_color).unwrap_or(Color::Cyan),
         );
 
-        if let Some(TimerRenderCommand::Stats {
+        if let Some(Stats {
             long_interval,
             total_sessions,
             focus_sessions,
@@ -87,7 +88,7 @@ impl TuiTimerRenderer {
         self.shortcuts(frame, rows[8]);
     }
 
-    fn session_label(&self, frame: &mut Frame, area: Rect, state: PomodoroState, paused: bool) {
+    fn state(&self, frame: &mut Frame, area: Rect, state: PomodoroState, paused: bool) {
         // TODO: Pre-compute this and store ascii instead
         let (label, color) = match state {
             PomodoroState::Focus => ("FOCUS", Color::LightRed),
@@ -98,11 +99,10 @@ impl TuiTimerRenderer {
         let center = Alignment::Center;
 
         if paused {
-            let paused_label = utils::ascii_future(" ( PAUSED )");
 
             let [area_label, area_paused] = Layout::horizontal([
                 Constraint::Length(utils::string_width(&label) as u16),
-                Constraint::Length(utils::string_width(&paused_label) as u16),
+                Constraint::Length(67),
             ])
             .flex(Flex::Center)
             .areas::<2>(area);
@@ -110,14 +110,9 @@ impl TuiTimerRenderer {
             let p_label = Paragraph::new(label)
                 .style(Style::default().fg(color).add_modifier(Modifier::BOLD))
                 .alignment(center);
-            let p_paused = Paragraph::new(paused_label).style(
-                Style::default()
-                    .fg(Color::Yellow)
-                    .add_modifier(Modifier::BOLD),
-            );
 
             frame.render_widget(&p_label, area_label);
-            frame.render_widget(&p_paused, area_paused);
+            frame.render_widget(&self.paused_p, area_paused);
         } else {
             let p = Paragraph::new(label)
                 .style(Style::default().fg(color))
@@ -199,6 +194,28 @@ impl TuiTimerRenderer {
         frame.render_widget(p, area);
     }
 
+    fn layout() -> Layout {
+        Layout::vertical([
+            Constraint::Fill(1),
+            Constraint::Length(3),  // state
+            Constraint::Length(2),
+            Constraint::Length(9),  // timer
+            Constraint::Length(1),  // progress_bar
+            Constraint::Length(1),
+            Constraint::Length(1),  // stats
+            Constraint::Length(1),
+            Constraint::Length(1),  // shortcuts
+            Constraint::Fill(1),
+        ])
+    }
+
+    fn paused_paragraph() -> (Paragraph<'static>, u16) {
+        let label = utils::ascii_future(" ( PAUSED )");
+        let width = utils::string_width(&label) as u16;
+        let p = Paragraph::new(label)
+            .style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD));
+        (p, width)
+    }
 }
 
 struct TuiSettingsRenderer;
