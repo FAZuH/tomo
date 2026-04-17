@@ -30,6 +30,7 @@ pub struct TuiRunner {
     should_quit: bool,
     renderer: TuiRenderer,
     terminal: Terminal<CrosstermBackend<std::io::Stdout>>,
+    needs_redraw: bool,
 }
 
 impl TuiRunner {
@@ -50,6 +51,7 @@ impl TuiRunner {
             should_quit: false,
             renderer,
             terminal,
+            needs_redraw: true,
         })
     }
 
@@ -72,21 +74,26 @@ impl TuiRunner {
 
     fn run_loop(&mut self) -> Result<(), TuiError> {
         let mut last_tick = Instant::now();
-        let tick_rate = Duration::from_millis(100);
+        let tick_rate = Duration::from_secs(1);
 
         while !self.should_quit {
             let now = Instant::now();
             if now.duration_since(last_tick) >= tick_rate {
                 self.app.tick()?;
-                last_tick = now
+                last_tick = now;
+                self.needs_redraw = true;
             }
 
-            self.render_terminal()?;
+            if self.needs_redraw {
+                self.render_terminal()?;
+                self.needs_redraw = false;
+            }
 
             if let Some(input) = Self::get_input()? {
-                self.handle_key_event(input)?
+                self.handle_key_event(input)?;
+                self.needs_redraw = true;
             }
-            sleep(Duration::from_millis(100));
+            sleep(Duration::from_millis(10));
         }
         Ok(())
     }
