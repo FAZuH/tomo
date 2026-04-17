@@ -33,6 +33,7 @@ impl TuiRunner {
         let app = App::builder()
             .pomodoro(pomodoro)
             .config(config)
+            .page(crate::ui::Page::Settings)
             .timer_view(Box::new(TuiTimerView::new()))
             .settings_view(Box::new(TuiSettingsView::new()))
             .build()?;
@@ -70,17 +71,15 @@ impl TuiRunner {
                 .draw(|f| renderer.flush(f, cmds))
                 .map_err(TuiError::from)?;
 
-            if event::poll(Duration::from_millis(100)).map_err(TuiError::from)? {
-                if let Event::Key(key) = event::read().map_err(TuiError::from)? {
-                    if let Some(input) = Input::from_keyevent(key) {
+            if event::poll(Duration::from_millis(100)).map_err(TuiError::from)?
+                && let Event::Key(key) = event::read().map_err(TuiError::from)?
+                    && let Some(input) = Input::from_keyevent(key) {
                         let nav = self.app.handle(input)?;
                         if matches!(nav, Navigation::Quit) {
                             break;
                         }
                         self.app.navigate(nav);
                     }
-                }
-            }
             sleep(Duration::from_millis(100));
         }
         Ok(())

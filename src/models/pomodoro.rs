@@ -122,7 +122,7 @@ impl Pomodoro {
     }
 
     pub fn state(&self) -> PomodoroState {
-        self.state.clone()
+        self.state
     }
 
     pub fn is_running(&self) -> bool {
@@ -158,12 +158,12 @@ impl Pomodoro {
 
     /// Gets session duration based on current state.
     pub fn session_duration(&self) -> Duration {
-        let duration = match self.state {
+        
+        match self.state {
             Focus => self.focus,
             LongBreak => self.long_break,
             ShortBreak => self.short_break,
-        };
-        duration
+        }
     }
 
     fn reset_time(&mut self) {
@@ -200,7 +200,7 @@ impl Pomodoro {
         match self.state {
             Focus => {
                 self.focus_sessions += 1;
-                if self.focus_sessions % self.long_interval == 0 {
+                if self.focus_sessions.is_multiple_of(self.long_interval) {
                     self.state = LongBreak;
                 } else {
                     self.state = ShortBreak;
@@ -379,7 +379,7 @@ mod tests {
     fn test_update() {
         let past = Instant::now().checked_sub(Duration::from_secs(1)).unwrap();
 
-        let mut pomo = Pomodoro {
+        let pomo = Pomodoro {
             frozen_remaining: Duration::from_secs(67),
             anchor: Some(past),
             accumulated: Duration::ZERO,

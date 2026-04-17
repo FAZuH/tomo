@@ -40,8 +40,8 @@ fn atodur(arg: &str) -> Result<Duration, CliArgumentError> {
     let secs = if let Some(suffix) = suffix {
         let time = &arg[..arg.len() - 1];
         match suffix {
-            'h' => time.parse::<f32>()? * 3600 as f32,
-            'm' => time.parse::<f32>()? * 60 as f32,
+            'h' => time.parse::<f32>()? * 3600_f32,
+            'm' => time.parse::<f32>()? * 60_f32,
             's' => time.parse::<f32>()?,
             _ => arg.parse::<f32>()?,
         }

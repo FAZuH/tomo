@@ -46,7 +46,7 @@ impl TuiTimerRenderer {
                 Timer { remaining: r } => timer = Some(*r),
                 Progress(p) => progress = *p,
                 PauseIndicator(p) => pause_indicator = *p,
-                Stats { .. } => stats = Some(cmd.clone()),
+                Stats { .. } => stats = Some(*cmd),
             }
         }
 
