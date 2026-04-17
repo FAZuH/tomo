@@ -4,85 +4,59 @@
 "use strict";
 const config = require("conventional-changelog-conventionalcommits");
 
-// chore!(major) -> major (0)
-// chore!(minor) -> minor (1)
-// otherwise -> patch (2)
 function whatBump(commits) {
   const hasMajor = commits.some(c => c?.header?.startsWith("chore!(major)"));
   const hasMinor = commits.some(c => c?.header?.startsWith("chore!(minor)"));
 
   if (hasMajor) {
-    return {
-      releaseType: "major",
-      reason: "Found a commit with a chore!(major) type."
-    };
+    return { releaseType: "major", reason: "Found a commit with a chore!(major) type." };
   }
-
   if (hasMinor) {
-    return {
-      releaseType: "minor",
-      reason: "Found a commit with a chore!(minor) type."
-    };
+    return { releaseType: "minor", reason: "Found a commit with a chore!(minor) type." };
   }
-
-  return {
-    releaseType: "patch",
-    reason: "No special commits found. Defaulting to a patch."
-  };
+  return { releaseType: "patch", reason: "No special commits found. Defaulting to a patch." };
 }
 
-// Check if commit should appear in changelog (has [public] marker)
 function isPublicCommit(commit) {
-  const publicMarker = /\[public\]/i;
+  const publicMarker = /\[pub(lic)?\]/i;
   const header = commit.header || "";
   const body = commit.body || "";
   const subject = commit.subject || "";
-
   return publicMarker.test(header) || publicMarker.test(body) || publicMarker.test(subject);
 }
 
 async function getOptions() {
   let options = await config({
     types: [
-      { type: "feat", section: "New Features" },
-      { type: "fix", section: "Bug Fixes" },
-      { type: "perf", section: "Performance Improvements" },
-      { type: "docs", section: "Documentation" },
-      { type: "revert", section: "Reverts" },
-
-      { type: "style", section: "Styles" },
-      { type: "chore", section: "Miscellaneous Chores" },
-      { type: "refactor", section: "Code Refactoring" },
-      { type: "test", section: "Tests" },
-      { type: "build", section: "Build System" },
-      { type: "ci", section: "Continuous Integration" },
+      { type: "feat",     section: "New Features",               hidden: true },
+      { type: "fix",      section: "Bug Fixes",                  hidden: true },
+      { type: "perf",     section: "Performance Improvements",   hidden: true },
+      { type: "docs",     section: "Documentation",              hidden: true },
+      { type: "revert",   section: "Reverts",                    hidden: true },
+      { type: "style",    section: "Styles",                     hidden: true },
+      { type: "chore",    section: "Miscellaneous Chores",       hidden: true },
+      { type: "refactor", section: "Code Refactoring",           hidden: true },
+      { type: "test",     section: "Tests",                      hidden: true },
+      { type: "build",    section: "Build System",               hidden: true },
+      { type: "ci",       section: "Continuous Integration",     hidden: true },
     ],
   });
 
-  // Both of these are used in different places...
   options.recommendedBumpOpts.whatBump = whatBump;
   options.whatBump = whatBump;
 
   if (options.writerOpts && options.writerOpts.transform) {
     const originalTransform = options.writerOpts.transform;
     options.writerOpts.transform = (commit, context) => {
-      // Filter out non-public commits (return null to exclude)
-      if (!isPublicCommit(commit)) {
-        return null;
-      }
+      if (!isPublicCommit(commit)) return null;
 
-      // Remove [public] marker and [skip ci] from display
-      const publicMarker = /\s*\[public\]/gi;
+      const markerRegex = /\s*\[pub(lic)?\]/gi;
       const skipCiRegex = /\s*\[skip ci\]/gi;
 
-      if (commit.header) {
-        commit.header = commit.header.replace(publicMarker, "").replace(skipCiRegex, "").trim();
-      }
-      if (commit.subject) {
-        commit.subject = commit.subject.replace(publicMarker, "").replace(skipCiRegex, "").trim();
-      }
+      if (commit.header) commit.header = commit.header.replace(markerRegex, "").replace(skipCiRegex, "").trim();
+      if (commit.subject) commit.subject = commit.subject.replace(markerRegex, "").replace(skipCiRegex, "").trim();
 
-      return originalTransform(commit, context);
+      return originalTransform(commit, context) ?? commit;
     };
   }
 

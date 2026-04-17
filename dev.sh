@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Development helper script for pwr-bot
+# Development helper script
 # Usage: ./dev.sh [command1] [command2] ...
 #   commands: format | lint | test | docs | all | help
 #   Multiple commands can be specified and will execute left to right
@@ -34,8 +34,6 @@ print_warning() {
 # Help function
 show_help() {
     cat << EOF
-pwr-bot Development Helper
-
 Usage: ./dev.sh [command1] [command2] ...
 
 Commands:

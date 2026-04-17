@@ -48,10 +48,29 @@ jobs:
           release-count: 5
 
   build:
-    name: Build Binary
+    name: Build Binary (${{ matrix.target }})
     needs: changelog
     if: ${{ needs.changelog.outputs.skipped != 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            binary: tomo
+            asset_name: tomo-linux-x64
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            binary: tomo.exe
+            asset_name: tomo-windows-x64.exe
+          - target: x86_64-apple-darwin
+            os: macos-latest
+            binary: tomo
+            asset_name: tomo-macos-x64
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            binary: tomo
+            asset_name: tomo-macos-arm64
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -60,23 +79,39 @@ jobs:
 
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
 
       - name: Rust Cache
         uses: Swatinem/rust-cache@v2
 
-      - name: Install system dependencies
+      - name: Install system dependencies (Linux)
+        if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get update
           sudo apt-get install -y --fix-missing libfontconfig1-dev
 
       - name: Build Package
-        run: cargo build --release
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Prepare Artifact (Unix)
+        if: matrix.os != 'windows-latest'
+        run: |
+          mkdir -p artifacts
+          cp target/${{ matrix.target }}/release/${{ matrix.binary }} artifacts/${{ matrix.asset_name }}
+          chmod +x artifacts/${{ matrix.asset_name }}
+
+      - name: Prepare Artifact (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          mkdir artifacts
+          copy target\${{ matrix.target }}\release\${{ matrix.binary }} artifacts\${{ matrix.asset_name }}
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: tomo
-          path: target/release/tomo
+          name: ${{ matrix.asset_name }}
+          path: artifacts/${{ matrix.asset_name }}
 
   release-github:
     name: Release to GitHub
@@ -87,8 +122,16 @@ jobs:
       - name: Download Artifacts
         uses: actions/download-artifact@v4
         with:
-          name: tomo
-          path: target/release
+          path: artifacts
+          pattern: tomo-*
+
+      - name: Prepare Release Files
+        run: |
+          mkdir -p release
+          cp artifacts/tomo-linux-x64/tomo-linux-x64 release/
+          cp artifacts/tomo-windows-x64.exe/tomo-windows-x64.exe release/
+          cp artifacts/tomo-macos-x64/tomo-macos-x64 release/
+          cp artifacts/tomo-macos-arm64/tomo-macos-arm64 release/
 
       - name: Create Release
         id: release
@@ -96,7 +139,7 @@ jobs:
         with:
           tag_name: ${{ needs.changelog.outputs.tag }}
           body: ${{ needs.changelog.outputs.changelog }}
-          files: target/release/tomo
+          files: release/*
 
       - name: Post Release on Discord
         uses: tsickert/discord-webhook@v6.0.0
