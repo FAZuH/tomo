@@ -3,7 +3,9 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use serde::Deserialize;
+use serde::Deserializer;
 use serde::Serialize;
+use serde::Serializer;
 
 use crate::debug;
 use crate::info;
@@ -59,8 +61,11 @@ pub struct PomodoroConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct PomodoroTimerConfig {
+    #[serde(with = "duration_as_secs")]
     pub focus: Duration,
+    #[serde(with = "duration_as_secs")]
     pub short: Duration,
+    #[serde(with = "duration_as_secs")]
     pub long: Duration,
 
     pub long_interval: u32,
@@ -68,6 +73,25 @@ pub struct PomodoroTimerConfig {
     pub auto_focus: bool,
     pub auto_short: bool,
     pub auto_long: bool,
+}
+
+mod duration_as_secs {
+    use super::*;
+
+    pub fn serialize<S>(duration: &Duration, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_u64(duration.as_secs())
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Duration, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let secs = u64::deserialize(deserializer)?;
+        Ok(Duration::from_secs(secs))
+    }
 }
 
 impl Default for PomodoroTimerConfig {
