@@ -81,9 +81,9 @@ pub fn commit_settings_edit(settings: &mut TuiSettingsRenderer) -> Option<Settin
         1 => TimerShort(parse_duration_minutes(&value)),
         2 => TimerLong(parse_duration_minutes(&value)),
         3 => TimerLongInterval(value.parse().unwrap_or(4)),
-        4 => TimerAutoFocus(parse_bool(&value)),
-        5 => TimerAutoShort(parse_bool(&value)),
-        6 => TimerAutoLong(parse_bool(&value)),
+        4 => TimerAutoFocus,
+        5 => TimerAutoShort,
+        6 => TimerAutoLong,
         // Hook settings (7-9)
         7 => HookFocus(value),
         8 => HookShort(value),
@@ -102,10 +102,6 @@ fn parse_duration_minutes(s: &str) -> Duration {
     s.parse::<u64>()
         .map(|m| Duration::from_secs(m * 60))
         .unwrap_or(Duration::from_secs(25 * 60))
-}
-
-fn parse_bool(s: &str) -> bool {
-    matches!(s.to_lowercase().as_str(), "true" | "yes" | "1" | "y")
 }
 
 fn parse_path(s: &str) -> Option<std::path::PathBuf> {

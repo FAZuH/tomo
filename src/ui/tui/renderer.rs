@@ -223,7 +223,6 @@ impl TuiTimerRenderer {
 
 pub struct TuiSettingsRenderer {
     scroll_state: ScrollViewState,
-    // TUI-specific selection state (not part of domain model)
     selected_idx: u32,
     editing: bool,
     edit_buffer: String,

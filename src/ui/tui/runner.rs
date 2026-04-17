@@ -24,6 +24,7 @@ use crate::ui::tui::input::commit_settings_edit;
 use crate::ui::tui::renderer::TuiRenderer;
 use crate::ui::tui::view::TuiSettingsView;
 use crate::ui::tui::view::TuiTimerView;
+use crate::ui::view::SettingsActions;
 
 pub struct TuiRunner {
     app: App,
@@ -145,7 +146,18 @@ impl TuiRunner {
         match input {
             Up | Char('k') => settings.select_up(),
             Down | Char('j') => settings.select_down(),
-            Enter => settings.start_editing(),
+            Enter => {
+                if SettingsActions::is_toggle_index(settings.selected_idx()) {
+                    self.save_settings()?
+                } else {
+                    settings.start_editing()
+                }
+            }
+            Char(' ') => {
+                if SettingsActions::is_toggle_index(settings.selected_idx()) {
+                    self.save_settings()?
+                }
+            }
             Esc => self.app.navigate(Navigation::GoTo(Page::Timer)),
             Char('q') => self.quit(),
             _ => {}
@@ -160,12 +172,7 @@ impl TuiRunner {
         use Input::*;
         match input {
             Esc => settings.cancel_editing(),
-            Enter => {
-                if let Some(action) = commit_settings_edit(settings) {
-                    let nav = self.app.handle_settings(action)?;
-                    self.handle_nav(nav)
-                }
-            }
+            Enter => self.save_settings()?,
             Backspace => settings.pop_char(),
             Char(c) if c.is_ascii_digit() || c == ':' => {
                 settings.push_char(c);
@@ -173,6 +180,14 @@ impl TuiRunner {
             _ => {}
         }
 
+        Ok(())
+    }
+
+    fn save_settings(&mut self) -> Result<(), TuiError> {
+        if let Some(action) = commit_settings_edit(&mut self.renderer.settings) {
+            let nav = self.app.handle_settings(action)?;
+            self.handle_nav(nav)
+        }
         Ok(())
     }
 

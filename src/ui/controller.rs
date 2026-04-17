@@ -73,23 +73,26 @@ impl SettingsController {
 
     pub fn handle(&mut self, action: SettingsActions) -> Result<Navigation, PomodoroError> {
         use SettingsActions::*;
+        let timer = &mut self.config.pomodoro.timer;
+        let hook = &mut self.config.pomodoro.hook;
+        let sound = &mut self.config.pomodoro.sound;
         match action {
             // Timer settings
-            TimerFocus(d) => self.config.pomodoro.timer.focus = d,
-            TimerShort(d) => self.config.pomodoro.timer.short = d,
-            TimerLong(d) => self.config.pomodoro.timer.long = d,
-            TimerLongInterval(n) => self.config.pomodoro.timer.long_interval = n,
-            TimerAutoFocus(v) => self.config.pomodoro.timer.auto_focus = v,
-            TimerAutoShort(v) => self.config.pomodoro.timer.auto_short = v,
-            TimerAutoLong(v) => self.config.pomodoro.timer.auto_long = v,
+            TimerFocus(d) => timer.focus = d,
+            TimerShort(d) => timer.short = d,
+            TimerLong(d) => timer.long = d,
+            TimerLongInterval(n) => timer.long_interval = n,
+            TimerAutoFocus => timer.auto_focus = !timer.auto_focus,
+            TimerAutoShort => timer.auto_short = !timer.auto_short,
+            TimerAutoLong => timer.auto_long = !timer.auto_long,
             // Hook settings
-            HookFocus(s) => self.config.pomodoro.hook.focus = s,
-            HookShort(s) => self.config.pomodoro.hook.short = s,
-            HookLong(s) => self.config.pomodoro.hook.long = s,
+            HookFocus(s) => hook.focus = s,
+            HookShort(s) => hook.short = s,
+            HookLong(s) => hook.long = s,
             // Sound settings
-            SoundFocus(p) => self.config.pomodoro.sound.focus = p,
-            SoundShort(p) => self.config.pomodoro.sound.short = p,
-            SoundLong(p) => self.config.pomodoro.sound.long = p,
+            SoundFocus(p) => sound.focus = p,
+            SoundShort(p) => sound.short = p,
+            SoundLong(p) => sound.long = p,
             Navigate(nav) => return Ok(nav),
         }
         Ok(Navigation::Stay)
