@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use figlet_rs::Toilet;
 
-use crate::debug;
+use crate::APP_NAME;
 
 pub fn conf_dir() -> PathBuf {
     #[cfg(any(target_os = "linux", target_os = "macos"))]
@@ -13,10 +13,7 @@ pub fn conf_dir() -> PathBuf {
     #[cfg(target_os = "windows")]
     let home = env::var("APPDATA").unwrap();
 
-    let ret = Path::new(&home).join("vigilance");
-    debug!("Config directory: {}/vigilance", ret.to_string_lossy());
-
-    ret
+    Path::new(&home).join(APP_NAME)
 }
 
 pub fn string_width(text: impl AsRef<str>) -> usize {

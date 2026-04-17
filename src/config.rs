@@ -56,7 +56,7 @@ pub struct PomodoroConfig {
     pub sound: PomodoroSoundConfig,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct PomodoroTimerConfig {
     pub focus: Duration,
@@ -68,6 +68,20 @@ pub struct PomodoroTimerConfig {
     pub auto_focus: bool,
     pub auto_short: bool,
     pub auto_long: bool,
+}
+
+impl Default for PomodoroTimerConfig {
+    fn default() -> Self {
+        Self {
+            focus: Duration::from_mins(25),
+            short: Duration::from_mins(5),
+            long: Duration::from_mins(10),
+            long_interval: 3,
+            auto_focus: false,
+            auto_short: false,
+            auto_long: false,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
