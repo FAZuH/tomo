@@ -1,7 +1,6 @@
 use crate::config::Config;
-use crate::models::Pomodoro;
 use crate::models::pomodoro::PomodoroError;
-use crate::ui::Navigation;
+use crate::models::Pomodoro;
 use crate::ui::view::SettingsRenderCommand;
 use crate::ui::view::SettingsView;
 use crate::ui::view::SettingsViewActions;
@@ -10,6 +9,7 @@ use crate::ui::view::TimerRenderCommand;
 use crate::ui::view::TimerView;
 use crate::ui::view::TimerViewActions;
 use crate::ui::view::TimerViewState;
+use crate::ui::Navigation;
 
 pub struct TimerController {
     view: Box<dyn TimerView>,
@@ -64,41 +64,42 @@ impl From<&Pomodoro> for TimerViewState {
 pub struct SettingsController {
     view: Box<dyn SettingsView>,
     config: Config,
-    curr_selection_idx: u32,
 }
 
 impl SettingsController {
     pub fn new(view: Box<dyn SettingsView>, config: Config) -> Self {
-        Self {
-            view,
-            config,
-            curr_selection_idx: 0,
-        }
+        Self { view, config }
     }
 
     pub fn handle(&mut self, action: SettingsViewActions) -> Result<Navigation, PomodoroError> {
         use SettingsViewActions::*;
         match action {
-            SelectDown => self.curr_selection_idx += 1,
-            SelectUp => self.curr_selection_idx -= 1,
-            EditSelection => todo!(),
+            // Timer settings
+            TimerFocus(d) => self.config.pomodoro.timer.focus = d,
+            TimerShort(d) => self.config.pomodoro.timer.short = d,
+            TimerLong(d) => self.config.pomodoro.timer.long = d,
+            TimerLongInterval(n) => self.config.pomodoro.timer.long_interval = n,
+            TimerAutoFocus(v) => self.config.pomodoro.timer.auto_focus = v,
+            TimerAutoShort(v) => self.config.pomodoro.timer.auto_short = v,
+            TimerAutoLong(v) => self.config.pomodoro.timer.auto_long = v,
+            // Hook settings
+            HookFocus(s) => self.config.pomodoro.hook.focus = s,
+            HookShort(s) => self.config.pomodoro.hook.short = s,
+            HookLong(s) => self.config.pomodoro.hook.long = s,
+            // Sound settings
+            SoundFocus(p) => self.config.pomodoro.sound.focus = p,
+            SoundShort(p) => self.config.pomodoro.sound.short = p,
+            SoundLong(p) => self.config.pomodoro.sound.long = p,
             Navigate(nav) => return Ok(nav),
         }
         Ok(Navigation::Stay)
     }
 
     pub fn render(&self) -> Vec<SettingsRenderCommand> {
-        let state = SettingsViewState::from(&self.config);
-        self.view.render(state)
-    }
-}
-
-impl From<&Config> for SettingsViewState {
-    fn from(value: &Config) -> Self {
-        let timer = value.pomodoro.timer.clone();
-        let hook = value.pomodoro.hook.clone();
-        let sound = value.pomodoro.sound.clone();
-        Self {
+        let timer = self.config.pomodoro.timer.clone();
+        let hook = self.config.pomodoro.hook.clone();
+        let sound = self.config.pomodoro.sound.clone();
+        let state = SettingsViewState {
             timer_focus: timer.focus,
             timer_short: timer.short,
             timer_long: timer.long,
@@ -112,6 +113,7 @@ impl From<&Config> for SettingsViewState {
             sound_focus: sound.focus,
             sound_short: sound.short,
             sound_long: sound.long,
-        }
+        };
+        self.view.render(state)
     }
 }

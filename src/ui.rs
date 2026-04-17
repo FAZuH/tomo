@@ -30,7 +30,3 @@ pub enum Input {
     Ctrl(char),
     Shift(char),
 }
-
-trait FromInput: Sized {
-    fn from_input(input: Input) -> Option<Self>;
-}

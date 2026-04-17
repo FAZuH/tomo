@@ -20,7 +20,7 @@ use crate::ui::view::SettingsRenderCommand;
 use crate::ui::view::TimerRenderCommand;
 use crate::utils;
 
-struct TuiTimerRenderer {
+pub struct TuiTimerRenderer {
     layout: Layout,
     paused_p: Paragraph<'static>,
 }
@@ -221,15 +221,69 @@ impl TuiTimerRenderer {
     }
 }
 
-struct TuiSettingsRenderer {
+pub struct TuiSettingsRenderer {
     scroll_state: ScrollViewState,
+    // TUI-specific selection state (not part of domain model)
+    selected_idx: u32,
+    editing: bool,
+    edit_buffer: String,
 }
 
 impl TuiSettingsRenderer {
     pub fn new() -> Self {
         Self {
             scroll_state: ScrollViewState::default(),
+            selected_idx: 0,
+            editing: false,
+            edit_buffer: String::new(),
         }
+    }
+
+    /// Move selection up
+    pub fn select_up(&mut self) {
+        self.selected_idx = self.selected_idx.saturating_sub(1).clamp(0, 12); // 13 items total
+    }
+
+    /// Move selection down
+    pub fn select_down(&mut self) {
+        self.selected_idx = self.selected_idx.saturating_add(1).clamp(0, 12);
+    }
+
+    /// Start editing the currently selected field
+    pub fn start_editing(&mut self) {
+        self.editing = true;
+        self.edit_buffer.clear();
+    }
+
+    /// Cancel editing
+    pub fn cancel_editing(&mut self) {
+        self.editing = false;
+        self.edit_buffer.clear();
+    }
+
+    /// Get current selection index
+    pub fn selected_idx(&self) -> u32 {
+        self.selected_idx
+    }
+
+    /// Check if currently editing
+    pub fn is_editing(&self) -> bool {
+        self.editing
+    }
+
+    /// Get the current edit buffer
+    pub fn edit_buffer(&self) -> &str {
+        &self.edit_buffer
+    }
+
+    /// Push a character to the edit buffer
+    pub fn push_char(&mut self, c: char) {
+        self.edit_buffer.push(c);
+    }
+
+    /// Pop a character from the edit buffer
+    pub fn pop_char(&mut self) {
+        self.edit_buffer.pop();
     }
 
     fn render(&mut self, frame: &mut Frame, cmds: Vec<SettingsRenderCommand>) {
@@ -258,13 +312,16 @@ impl TuiSettingsRenderer {
     }
 
     /// Flattens the hierarchical SettingsRenderCommand into a list of RenderRows
+    /// Returns rows with selection state applied from internal renderer state
     fn flatten_commands(&self, cmds: Vec<SettingsRenderCommand>) -> Vec<RenderRow> {
         let mut rows = Vec::new();
         rows.push(RenderRow::Title);
         rows.push(RenderRow::Blank);
 
+        let mut item_idx = 0u32;
+
         for cmd in cmds {
-            self.flatten_command(cmd, &mut rows, 0);
+            self.flatten_command(cmd, &mut rows, 0, &mut item_idx);
             // Add blank line after each top-level section
             rows.push(RenderRow::Blank);
         }
@@ -273,8 +330,13 @@ impl TuiSettingsRenderer {
     }
 
     /// Recursively flattens a command into rows
-    #[allow(clippy::only_used_in_recursion)]
-    fn flatten_command(&self, cmd: SettingsRenderCommand, rows: &mut Vec<RenderRow>, depth: u16) {
+    fn flatten_command(
+        &self,
+        cmd: SettingsRenderCommand,
+        rows: &mut Vec<RenderRow>,
+        depth: u16,
+        item_idx: &mut u32,
+    ) {
         use SettingsRenderCommand as S;
 
         match cmd {
@@ -284,7 +346,7 @@ impl TuiSettingsRenderer {
             S::Section { label, children } => {
                 rows.push(RenderRow::SectionHeader(label));
                 for child in children {
-                    self.flatten_command(child, rows, depth + 1);
+                    self.flatten_command(child, rows, depth + 1, item_idx);
                 }
             }
             S::SubSection {
@@ -292,14 +354,30 @@ impl TuiSettingsRenderer {
             } => {
                 rows.push(RenderRow::SubSectionHeader(label));
                 for child in children {
-                    self.flatten_command(child, rows, depth + 2);
+                    self.flatten_command(child, rows, depth + 2, item_idx);
                 }
             }
             S::Input { label, value } => {
-                rows.push(RenderRow::Input { label, value });
+                let idx = *item_idx;
+                *item_idx += 1;
+                let is_selected = self.selected_idx == idx;
+                let is_editing = is_selected && self.editing;
+                rows.push(RenderRow::Input {
+                    label,
+                    value,
+                    is_selected,
+                    is_editing,
+                });
             }
             S::Checkbox { label, value } => {
-                rows.push(RenderRow::Checkbox { label, value });
+                let idx = *item_idx;
+                *item_idx += 1;
+                let is_selected = self.selected_idx == idx;
+                rows.push(RenderRow::Checkbox {
+                    label,
+                    value,
+                    is_selected,
+                });
             }
         }
     }
@@ -341,25 +419,47 @@ impl TuiSettingsRenderer {
                 let p = Paragraph::new(line);
                 scroll_view.render_widget(p, area);
             }
-            RenderRow::Input { label, value } => {
+            RenderRow::Input {
+                label,
+                value,
+                is_selected,
+                is_editing,
+            } => {
+                let prefix = if *is_selected { ">>> " } else { "    " };
+                let (value_style, display_value) = if *is_editing {
+                    (
+                        Style::default()
+                            .fg(Color::Yellow)
+                            .add_modifier(Modifier::BOLD),
+                        // When editing, show the edit buffer instead of current value
+                        format!("{}█", self.edit_buffer),
+                    )
+                } else {
+                    (Style::default(), value.clone())
+                };
                 let line = Line::from(vec![
                     Span::styled(
-                        format!("    {}: ", label),
+                        format!("{}{}: ", prefix, label),
                         Style::default().add_modifier(Modifier::DIM),
                     ),
-                    Span::styled(value.clone(), Style::default()),
+                    Span::styled(display_value, value_style),
                 ]);
                 let p = Paragraph::new(line);
                 scroll_view.render_widget(p, area);
             }
-            RenderRow::Checkbox { label, value } => {
+            RenderRow::Checkbox {
+                label,
+                value,
+                is_selected,
+            } => {
+                let prefix = if *is_selected { ">>> " } else { "    " };
                 let checkbox = if *value {
                     Span::styled("[x]", Style::default().fg(Color::Cyan))
                 } else {
                     Span::styled("[ ]", Style::default().fg(Color::Cyan))
                 };
                 let line = Line::from(vec![
-                    Span::styled("    ", Style::default()),
+                    Span::styled(prefix, Style::default()),
                     checkbox,
                     Span::styled(" ", Style::default()),
                     Span::styled(label.clone(), Style::default()),
@@ -392,9 +492,18 @@ enum RenderRow {
     /// Subsection header (bold + dim, indented)
     SubSectionHeader(String),
     /// Input field with label and value
-    Input { label: String, value: String },
+    Input {
+        label: String,
+        value: String,
+        is_selected: bool,
+        is_editing: bool,
+    },
     /// Checkbox with label and checked state
-    Checkbox { label: String, value: bool },
+    Checkbox {
+        label: String,
+        value: bool,
+        is_selected: bool,
+    },
 }
 
 impl RenderRow {
@@ -408,8 +517,8 @@ impl RenderRow {
 }
 
 pub struct TuiRenderer {
-    timer: TuiTimerRenderer,
-    settings: TuiSettingsRenderer,
+    pub timer: TuiTimerRenderer,
+    pub settings: TuiSettingsRenderer,
 }
 
 impl TuiRenderer {
@@ -427,16 +536,6 @@ impl TuiRenderer {
                 RenderCommand::Settings(cmds) => self.settings.render(frame, cmds),
             }
         }
-    }
-
-    /// Scroll up in the settings view
-    pub fn settings_scroll_up(&mut self) {
-        self.settings.scroll_up();
-    }
-
-    /// Scroll down in the settings view
-    pub fn settings_scroll_down(&mut self) {
-        self.settings.scroll_down();
     }
 }
 

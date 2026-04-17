@@ -2,10 +2,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use crate::models::pomodoro::PomodoroState;
-use crate::ui::FromInput;
-use crate::ui::Input;
 use crate::ui::Navigation;
-use crate::ui::Page;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum RenderCommand {
@@ -40,26 +37,6 @@ pub enum TimerViewActions {
     Navigate(Navigation),
 }
 
-impl FromInput for TimerViewActions {
-    fn from_input(input: Input) -> Option<Self> {
-        use Input::*;
-        use TimerViewActions::*;
-        let ret = match input {
-            Left => Subtract(Duration::from_secs(30)),
-            Down => Subtract(Duration::from_secs(60)),
-            Right => Add(Duration::from_secs(30)),
-            Up => Add(Duration::from_secs(60)),
-            Char(' ') => TogglePause,
-            Enter => SkipSession,
-            Backspace => ResetSession,
-            Char('q') => Navigate(Navigation::Quit),
-            Char('s') => Navigate(Navigation::GoTo(Page::Settings)),
-            _ => return None,
-        };
-        Some(ret)
-    }
-}
-
 #[derive(Clone, Debug, Copy, PartialEq)]
 pub enum TimerRenderCommand {
     State(PomodoroState),
@@ -81,6 +58,8 @@ pub trait SettingsView {
     fn render(&self, state: SettingsViewState) -> Vec<SettingsRenderCommand>;
 }
 
+pub const SETTINGS_VIEW_ITEMS: u32 = 13;
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SettingsViewState {
     pub timer_focus: Duration,
@@ -100,33 +79,26 @@ pub struct SettingsViewState {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SettingsViewActions {
-    SelectDown,
-    SelectUp,
-    EditSelection,
+    // Timer settings
+    TimerFocus(Duration),
+    TimerShort(Duration),
+    TimerLong(Duration),
+    TimerLongInterval(u32),
+    TimerAutoFocus(bool),
+    TimerAutoShort(bool),
+    TimerAutoLong(bool),
+
+    // Hook settings
+    HookFocus(String),
+    HookShort(String),
+    HookLong(String),
+
+    // Sound settings
+    SoundFocus(Option<PathBuf>),
+    SoundShort(Option<PathBuf>),
+    SoundLong(Option<PathBuf>),
 
     Navigate(Navigation),
-}
-
-impl FromInput for SettingsViewActions {
-    fn from_input(input: Input) -> Option<Self> {
-        use Input::*;
-        use SettingsViewActions::*;
-        let ret = match input {
-            Up => SelectUp,
-            Down => SelectDown,
-            Enter => EditSelection,
-            Esc => Navigate(Navigation::GoTo(Page::Timer)),
-            Backspace => todo!(),
-            Char(char) => match char {
-                'j' => SelectDown,
-                'k' => SelectUp,
-                'q' => Navigate(Navigation::Quit),
-                _ => return None,
-            },
-            _ => return None,
-        };
-        Some(ret)
-    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
