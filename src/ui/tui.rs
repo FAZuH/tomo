@@ -1,3 +1,4 @@
+pub mod input;
 pub mod renderer;
 pub mod runner;
 pub mod view;
