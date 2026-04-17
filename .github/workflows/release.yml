@@ -75,8 +75,8 @@ jobs:
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: pwr-bot
-          path: target/release/pwr-bot
+          name: tomo
+          path: target/release/tomo
 
   release-github:
     name: Release to GitHub
@@ -87,7 +87,7 @@ jobs:
       - name: Download Artifacts
         uses: actions/download-artifact@v4
         with:
-          name: pwr-bot
+          name: tomo
           path: target/release
 
       - name: Create Release
@@ -96,14 +96,14 @@ jobs:
         with:
           tag_name: ${{ needs.changelog.outputs.tag }}
           body: ${{ needs.changelog.outputs.changelog }}
-          files: target/release/pwr-bot
+          files: target/release/tomo
 
       - name: Post Release on Discord
         uses: tsickert/discord-webhook@v6.0.0
         with:
           webhook-url: ${{ secrets.DISCORD_RELEASE_WEBHOOK_URL }}
           embed-color: "9498256"
-          embed-title: "pwr-bot ${{ needs.changelog.outputs.tag }}"
+          embed-title: "tomo ${{ needs.changelog.outputs.tag }}"
           embed-description: ${{ needs.changelog.outputs.changelog }}
           embed-url: ${{ steps.release.outputs.url }}
           embed-timestamp: ${{ github.event.head_commit.timestamp }}
