@@ -56,7 +56,14 @@ async function getOptions() {
       if (commit.header) commit.header = commit.header.replace(markerRegex, "").replace(skipCiRegex, "").trim();
       if (commit.subject) commit.subject = commit.subject.replace(markerRegex, "").replace(skipCiRegex, "").trim();
 
-      return originalTransform(commit, context) ?? commit;
+      const result = originalTransform(commit, context);
+      if (result) return result;
+
+      // originalTransform returned null (hidden type), but commit is public - force it through
+      if (commit.hash) {
+        commit.shortHash = commit.hash.substring(0, 7);
+      }
+      return commit;
     };
   }
 
@@ -64,3 +71,4 @@ async function getOptions() {
 }
 
 module.exports = getOptions();
+
