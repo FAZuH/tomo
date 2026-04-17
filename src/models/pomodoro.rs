@@ -158,7 +158,6 @@ impl Pomodoro {
 
     /// Gets session duration based on current state.
     pub fn session_duration(&self) -> Duration {
-        
         match self.state {
             Focus => self.focus,
             LongBreak => self.long_break,
@@ -254,8 +253,10 @@ mod tests {
 
     #[test]
     fn test_next_state_focus() {
-        let mut pomo = Pomodoro::default();
-        pomo.state = ShortBreak;
+        let mut pomo = Pomodoro {
+            state: ShortBreak,
+            ..Default::default()
+        };
 
         pomo.next_state();
         assert_eq!(pomo.state(), Focus)
@@ -289,9 +290,11 @@ mod tests {
 
     #[test]
     fn test_running_checks() {
-        let mut pomo = Pomodoro::default();
+        let mut pomo = Pomodoro {
+            running: false,
+            ..Default::default()
+        };
 
-        pomo.running = false;
         assert_eq!(pomo.check_running(), Err(PomodoroError::NotRunning));
 
         pomo.running = true;
@@ -364,9 +367,11 @@ mod tests {
 
     #[test]
     fn test_add() {
-        let mut pomo = Pomodoro::default();
-        pomo.frozen_remaining = Duration::from_secs(67);
-        pomo.running = false;
+        let mut pomo = Pomodoro {
+            frozen_remaining: Duration::from_secs(67),
+            running: false,
+            ..Default::default()
+        };
 
         pomo.add(Duration::from_secs(2));
         assert_eq!(pomo.remaining_time(), Duration::from_secs(69));

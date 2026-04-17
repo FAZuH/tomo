@@ -73,13 +73,14 @@ impl TuiRunner {
 
             if event::poll(Duration::from_millis(100)).map_err(TuiError::from)?
                 && let Event::Key(key) = event::read().map_err(TuiError::from)?
-                    && let Some(input) = Input::from_keyevent(key) {
-                        let nav = self.app.handle(input)?;
-                        if matches!(nav, Navigation::Quit) {
-                            break;
-                        }
-                        self.app.navigate(nav);
-                    }
+                && let Some(input) = Input::from_keyevent(key)
+            {
+                let nav = self.app.handle(input)?;
+                if matches!(nav, Navigation::Quit) {
+                    break;
+                }
+                self.app.navigate(nav);
+            }
             sleep(Duration::from_millis(100));
         }
         Ok(())
