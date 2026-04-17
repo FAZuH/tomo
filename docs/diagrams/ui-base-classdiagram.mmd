@@ -19,34 +19,17 @@ classDiagram
         Quit
     }
 
-    class Input:::action {
-        <<enumeration>>
-        Up
-        Down
-        Left
-        Right
-        Enter
-        Esc
-        Backspace
-        Char(char)
-        Ctrl(char)
-        Shift(char)
-    }
-
-    class FromInput:::action {
-        <<trait>>
-        +from_input(Input) Option~Self~
-    }
-
     class App:::controller {
         -active_page : Page
         -timer : TimerController
         -settings : SettingsController
         +builder() AppBuilder
-        +handle(input: Input) Result~Navigation, AppError~
+        +handle_timer(action: TimerActions) Result~Navigation, AppError~
+        +handle_settings(action: SettingsActions) Result~Navigation, AppError~
         +tick() Result~void, AppError~
         +render() Vec~RenderCommand~
         +navigate(nav: Navigation)
+        +active_page() Page
     }
 
     class AppBuilder:::controller {
@@ -63,7 +46,6 @@ classDiagram
     App *-- TimerController
     App *-- SettingsController
     App --> Navigation : navigates
-    App --> Input : handles
     App --> RenderCommand : creates
 
     namespace Timer {
@@ -71,7 +53,7 @@ classDiagram
             -view : Box~dyn TimerView~
             -model : Pomodoro
             +new(view, model) TimerController
-            +handle(action: TimerViewActions) Result~Navigation, PomodoroError~
+            +handle(action: TimerActions) Result~Navigation, PomodoroError~
             +tick()
             +render() Vec~TimerRenderCommand~
         }
@@ -92,17 +74,14 @@ classDiagram
             +progress_perc : f64
         }
 
-        class TimerViewActions:::action {
+        class TimerActions:::action {
             <<enumeration>>
-            Add30Sec
-            Add1Min
-            Sub30Sec
-            Sub1Min
+            Add(Duration)
+            Subtract(Duration)
             TogglePause
             SkipSession
             ResetSession
-            GoSettings
-            Quit
+            Navigate(Navigation)
         }
 
         class TimerRenderCommand:::renderCmd {
@@ -157,7 +136,7 @@ classDiagram
             -view : Box~dyn SettingsView~
             -config : Config
             +new(view, config) SettingsController
-            +handle(action: SettingsViewActions) Result~Navigation, PomodoroError~
+            +handle(action: SettingsActions) Result~Navigation, PomodoroError~
             +render() Vec~SettingsRenderCommand~
         }
 
@@ -182,7 +161,7 @@ classDiagram
             +sound_long : Option~PathBuf~
         }
 
-        class SettingsViewActions:::action {
+        class SettingsActions:::action {
             <<enumeration>>
             TimerFocus(Duration)
             TimerShort(Duration)
@@ -197,7 +176,7 @@ classDiagram
             SoundFocus(Option~PathBuf~)
             SoundShort(Option~PathBuf~)
             SoundLong(Option~PathBuf~)
-            GoTo(Page)
+            Navigate(Navigation)
         }
 
         class SectionLayout:::renderCmd {
@@ -224,11 +203,11 @@ classDiagram
 
     TimerController --> TimerRenderCommand : returns to App
     TimerView --> TimerRenderCommand : creates
-    TimerController --> TimerViewActions : handles
+    TimerController --> TimerActions : handles
 
     SettingsController --> SettingsRenderCommand : returns to App
     SettingsView --> SettingsRenderCommand : creates
-    SettingsController --> SettingsViewActions : handles
+    SettingsController --> SettingsActions : handles
     SettingsRenderCommand --> SectionLayout : layout
 
     TimerController *-- Pomodoro : model
@@ -242,8 +221,6 @@ classDiagram
 
     TimerView ..> TimerViewState : reads
     SettingsView ..> SettingsViewState : reads
-
-    TimerViewActions ..|> FromInput
 
     classDef view fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px,color:#000
     classDef controller fill:#bbdefb,stroke:#1565c0,stroke-width:2px,color:#000

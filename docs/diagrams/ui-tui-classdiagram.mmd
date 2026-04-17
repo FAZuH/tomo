@@ -12,6 +12,7 @@ classDiagram
             +new(config, pomodoro) Result~Self, AppBuildError~
             +run() Result~void, UiError~
             -run_loop(terminal, renderer) Result~void, UiError~
+            -handle_settings_input(Input, TuiRenderer) Result~void, UiError~
         }
 
         class TuiError {
@@ -22,6 +23,8 @@ classDiagram
 
     namespace Renderer {
         class TuiRenderer {
+            +timer : TuiTimerRenderer
+            +settings : TuiSettingsRenderer
             +flush(frame, commands: Vec~RenderCommand~)
         }
 
@@ -30,7 +33,22 @@ classDiagram
         }
 
         class TuiSettingsRenderer {
+            -scroll_state : ScrollViewState
+            -selected_idx : u32
+            -editing : bool
+            -edit_buffer : String
+            +new() Self
+            +select_up()
+            +select_down()
+            +start_editing()
+            +cancel_editing()
+            +is_editing() bool
+            +selected_idx() u32
+            +edit_buffer() &str
+            +push_char(char)
+            +pop_char()
             -render(frame, cmds: Vec~SettingsRenderCommand~)
+            -flatten_commands(cmds) Vec~RenderRow~
         }
 
         class RenderRow {
@@ -39,8 +57,8 @@ classDiagram
             Blank
             SectionHeader(label: String)
             SubSectionHeader(label: String)
-            Input(label: String, value: String)
-            Checkbox(label: String, value: bool)
+            Input(label: String, value: String, is_selected: bool, is_editing: bool)
+            Checkbox(label: String, value: bool, is_selected: bool)
             +height() u16
         }
     }
@@ -52,6 +70,29 @@ classDiagram
 
         class TuiSettingsView {
             +new() Self
+        }
+    }
+
+    namespace InputMapping {
+        class Input:::action {
+            <<enumeration>>
+            Up, Down, Left, Right
+            Enter, Esc, Backspace
+            Char(char), Ctrl(char), Shift(char)
+        }
+
+        class TimerInputMapper {
+            +new() Self
+            +into_action(Input) Option~TimerActions~
+        }
+
+        class SettingsInputMapper {
+            +into_action(Input) Option~SettingsActions~
+        }
+
+        class InputMapper~I, A~ {
+            <<trait>>
+            +into_action(I) Option~A~
         }
     }
 
@@ -67,3 +108,14 @@ classDiagram
 
     TuiTimerView ..|> TimerView : implements
     TuiSettingsView ..|> SettingsView : implements
+
+    TimerInputMapper ..|> InputMapper : implements
+    SettingsInputMapper ..|> InputMapper : implements
+    TimerInputMapper ..> Input : maps from
+    SettingsInputMapper ..> Input : maps from
+
+    classDef view fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px,color:#000
+    classDef controller fill:#bbdefb,stroke:#1565c0,stroke-width:2px,color:#000
+    classDef state fill:#fff9c4,stroke:#fbc02d,stroke-width:2px,color:#000
+    classDef renderCmd fill:#ffccbc,stroke:#d84315,stroke-width:2px,color:#000
+    classDef action fill:#cfd8dc,stroke:#455a64,stroke-width:2px,color:#000

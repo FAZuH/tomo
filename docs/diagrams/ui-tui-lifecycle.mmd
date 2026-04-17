@@ -8,6 +8,7 @@ sequenceDiagram
     participant TV as TuiTimerView
     participant SV as TuiSettingsView
     participant TRen as TuiRenderer
+    participant TS as TuiSettingsRenderer
 
     rect rgb(180, 200, 220)
         note right of TR: INITIALIZATION
@@ -63,8 +64,11 @@ sequenceDiagram
                 TRen->>TRen: TuiTimerRenderer::render(frame, cmds)
                 Note over TRen: Layout splits frame.area() then renders state, timer, progress_bar, stats, shortcuts
             else Settings commands
-                TRen->>TRen: TuiSettingsRenderer::render(frame, cmds)
-                Note over TRen: Flatten cmds → RenderRow list, create ScrollView, render BigText title + sections, show scrollbar if needed
+                TRen->>TS: render(frame, cmds)
+                activate TS
+                Note over TS: 1. Apply internal selection state to commands<br/>2. Flatten → RenderRow list with is_selected flags<br/>3. Create ScrollView, render with highlights
+                TS-->>TRen: frame drawn
+                deactivate TS
             end
             TRen-->>TR: frame drawn
             deactivate TRen
@@ -74,42 +78,76 @@ sequenceDiagram
     end
 
     rect rgb(220, 180, 190)
-        note right of TR: INPUT HANDLING
+        note right of TR: INPUT HANDLING (Timer)
         TR->>TR: poll KeyEvent (100ms)
         U->>TR: Key press
         TR->>TR: KeyEvent → Input
 
-        alt Timer page input
-            TR->>A: handle(Input)
-            activate A
-            A->>TC: handle(TimerViewActions)
-            activate TC
-            alt Navigation action
-                TC-->>A: Ok(Navigation::GoTo(Settings) or Quit)
-            else State mutation
-                TC->>TC: model.mutate()
-                TC-->>A: Ok(Navigation::Stay)
+        alt Timer page
+            TR->>TR: TimerInputMapper::into_action(Input)
+            activate TR
+            TR-->>TR: Option~TimerActions~
+            deactivate TR
+            opt Action produced
+                TR->>A: handle_timer(TimerActions)
+                activate A
+                A->>TC: handle(action)
+                activate TC
+                alt Navigation action
+                    TC-->>A: Ok(Navigation::GoTo(Settings) or Quit)
+                else State mutation
+                    TC->>TC: model.mutate()
+                    TC-->>A: Ok(Navigation::Stay)
+                end
+                deactivate TC
+                A-->>TR: Ok(Navigation)
+                deactivate A
             end
-            deactivate TC
-            A-->>TR: Ok(Navigation)
-            deactivate A
-        else Settings page input
-            TR->>A: handle(Input)
-            activate A
-            A->>SC: handle(SettingsViewActions)
-            activate SC
-            SC->>SC: config.mutate()
-            SC-->>A: Ok(Navigation)
-            deactivate SC
-            A-->>TR: Ok(Navigation)
-            deactivate A
         end
+    end
 
-        alt Navigation::Quit
-            TR-->>TR: break loop
-        else Navigation::GoTo(page)
-            TR->>A: navigate(nav)
-            A->>A: active_page = page
+    rect rgb(220, 180, 190)
+        note right of TR: INPUT HANDLING (Settings)
+        note over TR, TS: Settings input handled DIRECTLY on renderer
+        
+        TR->>TR: poll KeyEvent (100ms)
+        U->>TR: Key press (Settings page)
+        TR->>TR: KeyEvent → Input
+
+        alt Navigation (Up/Down/j/k)
+            TR->>TS: select_up() / select_down()
+            Note over TS: Mutates internal selected_idx only
+        else Start editing (Enter)
+            TR->>TS: start_editing()
+            Note over TS: Sets editing=true, clears buffer
+        else Type while editing
+            TR->>TS: push_char(c) / pop_char()
+            Note over TS: Mutates edit_buffer
+        else Commit edit (Enter while editing)
+            TR->>TR: commit_settings_edit(renderer)
+            activate TR
+            TR->>TS: get selected_idx + edit_buffer
+            TR->>TS: cancel_editing()
+            TR->>TR: build SettingsActions from buffer
+            TR-->>TR: Option~SettingsActions~
+            deactivate TR
+            opt Action produced
+                TR->>A: handle_settings(SettingsActions)
+                activate A
+                A->>SC: handle(action)
+                activate SC
+                SC->>SC: config.mutate()
+                SC-->>A: Ok(Navigation)
+                deactivate SC
+                A-->>TR: Ok(Navigation)
+                deactivate A
+            end
+        else Cancel edit (Esc while editing)
+            TR->>TS: cancel_editing()
+        else Navigate away (Esc)
+            TR->>A: navigate(GoTo(Timer))
+        else Quit (q)
+            TR->>A: handle_settings(Navigate(Quit))
         end
     end
 

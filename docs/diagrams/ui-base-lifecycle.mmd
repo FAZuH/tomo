@@ -2,26 +2,39 @@ sequenceDiagram
     autonumber
     participant U as User
     participant App as App
-    participant C as Controller
-    participant M as Model
+    participant TC as TimerController
+    participant SC as SettingsController
     participant V as View
+    participant M as Model
 
     rect rgb(180, 200, 220)
         note right of App: INITIALIZATION
         App->>App: AppBuilder::build()
         activate App
-        App->>C: new PageController(view, model)
-        activate C
-        C->>M: new Model()
+        App->>TC: new TimerController(view, model)
+        activate TC
+        TC->>M: new Pomodoro()
         activate M
-        M-->>C: model
+        M-->>TC: model
         deactivate M
-        C->>V: new View()
+        TC->>V: new TuiTimerView()
         activate V
-        V-->>C: view
+        V-->>TC: view
         deactivate V
-        C-->>App: controller
-        deactivate C
+        TC-->>App: timer_controller
+        deactivate TC
+        App->>SC: new SettingsController(view, config)
+        activate SC
+        SC->>M: Config
+        activate M
+        M-->>SC: config
+        deactivate M
+        SC->>V: new TuiSettingsView()
+        activate V
+        V-->>SC: view
+        deactivate V
+        SC-->>App: settings_controller
+        deactivate SC
         App-->>App: app
         deactivate App
     end
@@ -29,45 +42,74 @@ sequenceDiagram
     rect rgb(180, 220, 190)
         note right of App: TICK CYCLE
         loop Every tick
-            App->>C: tick()
-            activate C
-            C->>M: updates models
+            App->>TC: tick()
+            activate TC
+            TC->>M: model.update()
             activate M
-            M-->>C: Ok
+            M-->>TC: Ok
             deactivate M
-            C-->>App: Ok
-            deactivate C
+            TC-->>App: Ok
+            deactivate TC
         end
     end
 
     rect rgb(220, 180, 190)
-        note right of App: INPUT → RENDER CYCLE
-        U->>App: Input event
-        App->>C: handle(action)
-        activate C
-        C->>M: mutate state
+        note right of App: INPUT → RENDER CYCLE (Timer)
+        note over U, App: Platform layer converts Input to TimerActions
+        U->>App: TimerActions
+        App->>TC: handle(action)
+        activate TC
+        TC->>M: mutate model
         activate M
-        M-->>C: Ok
+        M-->>TC: Ok
         deactivate M
-        C-->>App: Ok(Navigation)
-        deactivate C
+        TC-->>App: Ok(Navigation)
+        deactivate TC
 
-        App->>C: render()
-        activate C
-        C->>V: render(view_state)
+        App->>TC: render()
+        activate TC
+        TC->>V: render(TimerViewState)
         activate V
-        V-->>C: Vec~RenderCommand~
+        V-->>TC: Vec~TimerRenderCommand~
         deactivate V
-        C-->>App: Vec~RenderCommand~
-        deactivate C
+        TC-->>App: Vec~TimerRenderCommand~
+        deactivate TC
+    end
+
+    rect rgb(220, 180, 190)
+        note right of App: INPUT → RENDER CYCLE (Settings)
+        note over U, App: Platform layer converts Input to SettingsActions
+        U->>App: SettingsActions
+        App->>SC: handle(action)
+        activate SC
+        SC->>M: mutate config
+        activate M
+        M-->>SC: Ok
+        deactivate M
+        SC-->>App: Ok(Navigation)
+        deactivate SC
+
+        App->>SC: render()
+        activate SC
+        SC->>V: render(SettingsViewState)
+        activate V
+        V-->>SC: Vec~SettingsRenderCommand~
+        deactivate V
+        SC-->>App: Vec~SettingsRenderCommand~
+        deactivate SC
     end
 
     rect rgb(220, 180, 190)
         note right of App: NAVIGATION
-        U->>App: Input (navigation)
-        App->>C: handle(action)
-        activate C
-        C-->>App: Ok(Navigation::GoTo(Page))
-        deactivate C
+        note over U, App: Via TimerActions::Navigate or SettingsActions::Navigate
+        U->>App: Navigation action
+        alt Timer page
+            App->>TC: handle(Navigate)
+            TC-->>App: Ok(Navigation::GoTo(Page))
+        else Settings page
+            App->>SC: handle(Navigate)
+            SC-->>App: Ok(Navigation::GoTo(Page))
+        end
         App->>App: navigate(Navigation)
+        App->>App: active_page = page
     end
