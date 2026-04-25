@@ -153,10 +153,8 @@ impl TuiRunner {
                     settings.start_editing()
                 }
             }
-            Char(' ') => {
-                if SettingsActions::is_toggle_index(settings.selected_idx()) {
-                    self.save_settings()?
-                }
+            Char(' ') if SettingsActions::is_toggle_index(settings.selected_idx()) => {
+                self.save_settings()?
             }
             Esc => self.app.navigate(Navigation::GoTo(Page::Timer)),
             Char('q') => self.quit(),
