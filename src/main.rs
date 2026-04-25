@@ -1,20 +1,9 @@
-pub mod cli;
-pub mod config;
-pub mod error;
-pub mod log;
-pub mod models;
-pub mod ui;
-pub mod utils;
-
 use clap::Parser;
-use cli::Cli;
-
-use crate::config::Config;
-use crate::error::Error;
-use crate::models::Pomodoro;
-use crate::ui::tui::TuiRunner;
-
-pub const APP_NAME: &str = env!("CARGO_PKG_NAME");
+use tomo::cli::Cli;
+use tomo::config::Config;
+use tomo::error::Error;
+use tomo::models::Pomodoro;
+use tomo::ui::tui::TuiRunner;
 
 fn main() -> Result<(), Error> {
     let cli = Cli::parse();

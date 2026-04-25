@@ -49,6 +49,4 @@ jobs:
         run: cargo clippy --all-features --all-targets --no-deps -- -D warnings
 
       - name: Run Tests
-        run: |
-          cp .env-example .env
-          cargo test --all-features --no-fail-fast
+        run: cargo test --all-features --no-fail-fast

@@ -6,6 +6,8 @@ use ratatui::layout::Layout;
 use ratatui::layout::Rect;
 use ratatui::layout::Size;
 use ratatui::prelude::*;
+use ratatui::widgets::Block;
+use ratatui::widgets::Borders;
 use ratatui::widgets::Gauge;
 use ratatui::widgets::Paragraph;
 use tui_widgets::big_text::BigText;
@@ -16,6 +18,7 @@ use tui_widgets::scrollview::ScrollbarVisibility;
 
 use crate::models::pomodoro::PomodoroState;
 use crate::ui::view::RenderCommand;
+use crate::ui::view::SETTINGS_VIEW_ITEMS;
 use crate::ui::view::SettingsRenderCommand;
 use crate::ui::view::TimerRenderCommand;
 use crate::utils;
@@ -221,6 +224,30 @@ impl TuiTimerRenderer {
     }
 }
 
+/// Section color scheme for visual distinction
+#[derive(Clone, Copy, Debug)]
+enum SectionColor {
+    Timer,
+    Hooks,
+    Sounds,
+}
+
+impl SectionColor {
+    fn border_color(self) -> Color {
+        match self {
+            SectionColor::Timer => Color::Cyan,
+            SectionColor::Hooks => Color::Yellow,
+            SectionColor::Sounds => Color::Magenta,
+        }
+    }
+
+    fn title_style(self) -> Style {
+        Style::default()
+            .fg(self.border_color())
+            .add_modifier(Modifier::BOLD)
+    }
+}
+
 pub struct TuiSettingsRenderer {
     scroll_state: ScrollViewState,
     selected_idx: u32,
@@ -240,12 +267,18 @@ impl TuiSettingsRenderer {
 
     /// Move selection up
     pub fn select_up(&mut self) {
-        self.selected_idx = self.selected_idx.saturating_sub(1).clamp(0, 12); // 13 items total
+        self.selected_idx = self
+            .selected_idx
+            .saturating_sub(1)
+            .clamp(0, SETTINGS_VIEW_ITEMS - 1); // 13 items total
     }
 
     /// Move selection down
     pub fn select_down(&mut self) {
-        self.selected_idx = self.selected_idx.saturating_add(1).clamp(0, 12);
+        self.selected_idx = self
+            .selected_idx
+            .saturating_add(1)
+            .clamp(0, SETTINGS_VIEW_ITEMS - 1);
     }
 
     /// Start editing the currently selected field
@@ -287,182 +320,257 @@ impl TuiSettingsRenderer {
 
     fn render(&mut self, frame: &mut Frame, cmds: Vec<SettingsRenderCommand>) {
         let area = frame.area();
-        let rows = self.flatten_commands(cmds);
+        // Reserve space for scrollbar and padding
+        let content_width = area.width.saturating_sub(4).max(46);
 
-        // Calculate total content height
-        let total_height: u16 = rows.iter().map(|row| row.height()).sum();
-        let content_width = area.width.saturating_sub(2).max(40); // Reserve 2 cols for scrollbar
+        // Build sections with proper layout
+        let sections = self.build_sections(cmds, content_width);
 
-        // Create scroll view with content size
+        // Calculate total height: title (4) + spacing (1) + sections + padding (2)
+        let sections_height: u16 = sections.iter().map(|s| s.height).sum();
+        let total_height: u16 = 4 + 1 + sections_height + 2;
+
+        // Create scroll view with full content size
         let mut scroll_view = ScrollView::new(Size::new(content_width, total_height))
             .vertical_scrollbar_visibility(ScrollbarVisibility::Automatic);
 
-        // Render all rows into the scroll view
-        let mut y = 0u16;
-        for row in rows {
-            let height = row.height();
-            let row_area = Rect::new(0, y, content_width, height);
-            self.render_row(&mut scroll_view, row_area, &row);
-            y += height;
+        // Render title at top
+        let title_area = Rect::new(0, 0, content_width, 4);
+        self.render_title(&mut scroll_view, title_area);
+
+        // Render sections with proper spacing
+        let mut y = 5u16; // Start after title + 1 row spacing
+        for section in sections {
+            let section_area = Rect::new(0, y, content_width, section.height);
+            self.render_section(&mut scroll_view, section_area, &section);
+            y += section.height;
         }
 
-        // Render the scroll view into the frame
         frame.render_stateful_widget(scroll_view, area, &mut self.scroll_state);
     }
 
-    /// Flattens the hierarchical SettingsRenderCommand into a list of RenderRows
-    /// Returns rows with selection state applied from internal renderer state
-    fn flatten_commands(&self, cmds: Vec<SettingsRenderCommand>) -> Vec<RenderRow> {
-        let mut rows = Vec::new();
-        rows.push(RenderRow::Title);
-        rows.push(RenderRow::Blank);
+    fn render_title(&self, scroll_view: &mut ScrollView, area: Rect) {
+        let big_text = BigText::builder()
+            .pixel_size(PixelSize::Quadrant)
+            .style(
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            )
+            .lines(vec!["Settings".into()])
+            .centered()
+            .build();
+        scroll_view.render_widget(big_text, area);
+    }
 
+    /// Build sections from commands, calculating layout and identifying editable items
+    fn build_sections(&self, cmds: Vec<SettingsRenderCommand>, width: u16) -> Vec<Section> {
+        let mut sections = Vec::new();
         let mut item_idx = 0u32;
 
         for cmd in cmds {
-            self.flatten_command(cmd, &mut rows, 0, &mut item_idx);
-            // Add blank line after each top-level section
-            rows.push(RenderRow::Blank);
+            if let SettingsRenderCommand::Section { label, children } = cmd {
+                let section_color = Self::section_color_from_label(&label);
+                let section =
+                    self.build_section(&label, children, width, section_color, &mut item_idx);
+                sections.push(section);
+            }
         }
 
-        rows
+        sections
     }
 
-    /// Recursively flattens a command into rows
-    #[allow(clippy::only_used_in_recursion)]
-    fn flatten_command(
+    fn section_color_from_label(label: &str) -> SectionColor {
+        if label.contains("Timer") {
+            SectionColor::Timer
+        } else if label.contains("Hook") {
+            SectionColor::Hooks
+        } else if label.contains("Sound") {
+            SectionColor::Sounds
+        } else {
+            SectionColor::Timer
+        }
+    }
+
+    fn build_section(
+        &self,
+        label: &str,
+        children: Vec<SettingsRenderCommand>,
+        _width: u16,
+        color: SectionColor,
+        item_idx: &mut u32,
+    ) -> Section {
+        let mut rows: Vec<SectionRow> = Vec::new();
+
+        for child in children {
+            match child {
+                SettingsRenderCommand::SubSection {
+                    label: sub_label,
+                    children: sub_children,
+                    ..
+                } => {
+                    // Add spacing before subsection header (except for first item)
+                    if !rows.is_empty() {
+                        rows.push(SectionRow::Blank);
+                    }
+                    // Add subsection header with visual indicator
+                    rows.push(SectionRow::SubSectionHeader(sub_label.clone()));
+
+                    // Add all children vertically
+                    for sub_child in sub_children {
+                        self.add_command_to_rows(sub_child, &mut rows, item_idx);
+                    }
+                }
+                _ => {
+                    self.add_command_to_rows(child, &mut rows, item_idx);
+                }
+            }
+        }
+
+        // Calculate height: 2 for borders + sum of row heights
+        let height = 2 + rows.iter().map(|r| r.height()).sum::<u16>();
+
+        Section {
+            title: label.to_string(),
+            color,
+            height,
+            rows,
+        }
+    }
+
+    fn add_command_to_rows(
         &self,
         cmd: SettingsRenderCommand,
-        rows: &mut Vec<RenderRow>,
-        depth: u16,
+        rows: &mut Vec<SectionRow>,
         item_idx: &mut u32,
     ) {
-        use SettingsRenderCommand as S;
-
         match cmd {
-            S::Title => {
-                // Title is handled separately at the start
-            }
-            S::Section { label, children } => {
-                rows.push(RenderRow::SectionHeader(label));
-                for child in children {
-                    self.flatten_command(child, rows, depth + 1, item_idx);
-                }
-            }
-            S::SubSection {
-                label, children, ..
-            } => {
-                rows.push(RenderRow::SubSectionHeader(label));
-                for child in children {
-                    self.flatten_command(child, rows, depth + 2, item_idx);
-                }
-            }
-            S::Input { label, value } => {
+            SettingsRenderCommand::Input { label, value } => {
                 let idx = *item_idx;
                 *item_idx += 1;
                 let is_selected = self.selected_idx == idx;
                 let is_editing = is_selected && self.editing;
-                rows.push(RenderRow::Input {
+                rows.push(SectionRow::Input {
                     label,
                     value,
+                    idx,
                     is_selected,
                     is_editing,
                 });
             }
-            S::Checkbox { label, value } => {
+            SettingsRenderCommand::Checkbox { label, value } => {
                 let idx = *item_idx;
                 *item_idx += 1;
                 let is_selected = self.selected_idx == idx;
-                rows.push(RenderRow::Checkbox {
+                rows.push(SectionRow::Checkbox {
                     label,
                     value,
+                    idx,
                     is_selected,
                 });
             }
+            _ => {}
         }
     }
 
-    /// Renders a single row into the scroll view buffer
-    fn render_row(&self, scroll_view: &mut ScrollView, area: Rect, row: &RenderRow) {
+    fn render_section(&self, scroll_view: &mut ScrollView, area: Rect, section: &Section) {
+        // Create block with border
+        let block = Block::default()
+            .title(section.title.clone())
+            .title_style(section.color.title_style())
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(section.color.border_color()));
+
+        // Render the block
+        scroll_view.render_widget(block.clone(), area);
+
+        // Get inner area for content
+        let inner = block.inner(area);
+        let inner = Rect::new(inner.x, inner.y, inner.width, inner.height);
+
+        // Render rows inside the block
+        let mut y = inner.y;
+        for row in &section.rows {
+            let row_height = row.height();
+            let row_area = Rect::new(inner.x, y, inner.width, row_height);
+            self.render_section_row(scroll_view, row_area, row);
+            y += row_height;
+        }
+    }
+
+    fn render_section_row(&self, scroll_view: &mut ScrollView, area: Rect, row: &SectionRow) {
         match row {
-            RenderRow::Title => {
-                let big_text = BigText::builder()
-                    .pixel_size(PixelSize::Quadrant)
-                    .style(
-                        Style::default()
-                            .fg(Color::Cyan)
-                            .add_modifier(Modifier::BOLD),
-                    )
-                    .lines(vec!["Settings".into()])
-                    .centered()
-                    .build();
-                scroll_view.render_widget(big_text, area);
+            SectionRow::Blank => {
+                // Nothing to render for blank rows
             }
-            RenderRow::Blank => {
-                // No need to render anything for blank rows
-            }
-            RenderRow::SectionHeader(label) => {
+            SectionRow::SubSectionHeader(label) => {
                 let line = Line::from(vec![Span::styled(
-                    label.clone(),
-                    Style::default().add_modifier(Modifier::BOLD),
-                )]);
-                let p = Paragraph::new(line);
-                scroll_view.render_widget(p, area);
-            }
-            RenderRow::SubSectionHeader(label) => {
-                let line = Line::from(vec![Span::styled(
-                    format!("  {}", label),
+                    format!("▸ {} ", label),
                     Style::default()
+                        .fg(Color::White)
                         .add_modifier(Modifier::BOLD)
-                        .add_modifier(Modifier::DIM),
+                        .add_modifier(Modifier::UNDERLINED),
                 )]);
                 let p = Paragraph::new(line);
                 scroll_view.render_widget(p, area);
             }
-            RenderRow::Input {
+            SectionRow::Input {
                 label,
                 value,
                 is_selected,
                 is_editing,
+                ..
             } => {
-                let prefix = if *is_selected { ">>> " } else { "    " };
+                let selected_bg = if *is_selected {
+                    Style::default().bg(Color::DarkGray)
+                } else {
+                    Style::default()
+                };
+
                 let (value_style, display_value) = if *is_editing {
                     (
                         Style::default()
                             .fg(Color::Yellow)
                             .add_modifier(Modifier::BOLD),
-                        // When editing, show the edit buffer instead of current value
                         format!("{}█", self.edit_buffer),
                     )
                 } else {
                     (Style::default(), value.clone())
                 };
+
                 let line = Line::from(vec![
                     Span::styled(
-                        format!("{}{}: ", prefix, label),
-                        Style::default().add_modifier(Modifier::DIM),
+                        format!("{}: ", label),
+                        Style::default()
+                            .add_modifier(Modifier::DIM)
+                            .patch(selected_bg),
                     ),
-                    Span::styled(display_value, value_style),
+                    Span::styled(display_value, value_style.patch(selected_bg)),
                 ]);
                 let p = Paragraph::new(line);
                 scroll_view.render_widget(p, area);
             }
-            RenderRow::Checkbox {
+            SectionRow::Checkbox {
                 label,
                 value,
                 is_selected,
+                ..
             } => {
-                let prefix = if *is_selected { ">>> " } else { "    " };
-                let checkbox = if *value {
-                    Span::styled("[x]", Style::default().fg(Color::Cyan))
+                let selected_bg = if *is_selected {
+                    Style::default().bg(Color::DarkGray)
                 } else {
-                    Span::styled("[ ]", Style::default().fg(Color::Cyan))
+                    Style::default()
+                };
+
+                let checkbox = if *value {
+                    Span::styled("[x]", Style::default().fg(Color::Cyan).patch(selected_bg))
+                } else {
+                    Span::styled("[ ]", Style::default().fg(Color::Cyan).patch(selected_bg))
                 };
                 let line = Line::from(vec![
-                    Span::styled(prefix, Style::default()),
                     checkbox,
-                    Span::styled(" ", Style::default()),
-                    Span::styled(label.clone(), Style::default()),
+                    Span::styled(" ", selected_bg),
+                    Span::styled(label.clone(), selected_bg),
                 ]);
                 let p = Paragraph::new(line);
                 scroll_view.render_widget(p, area);
@@ -481,36 +589,39 @@ impl TuiSettingsRenderer {
     }
 }
 
-/// Internal representation of a row to render in the settings view
-enum RenderRow {
-    /// Title using BigText (4 rows tall)
-    Title,
-    /// Blank line for spacing
+/// Represents a section with border
+struct Section {
+    title: String,
+    color: SectionColor,
+    height: u16,
+    rows: Vec<SectionRow>,
+}
+
+/// Individual row within a section
+enum SectionRow {
     Blank,
-    /// Section header with icon (bold)
-    SectionHeader(String),
-    /// Subsection header (bold + dim, indented)
     SubSectionHeader(String),
-    /// Input field with label and value
     Input {
         label: String,
         value: String,
+        #[allow(dead_code)]
+        idx: u32,
         is_selected: bool,
         is_editing: bool,
     },
-    /// Checkbox with label and checked state
     Checkbox {
         label: String,
         value: bool,
+        #[allow(dead_code)]
+        idx: u32,
         is_selected: bool,
     },
 }
 
-impl RenderRow {
-    /// Returns the height of this row in terminal rows
+impl SectionRow {
     fn height(&self) -> u16 {
         match self {
-            Self::Title => 4,
+            Self::Blank => 1,
             _ => 1,
         }
     }

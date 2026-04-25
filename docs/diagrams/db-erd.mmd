@@ -1,0 +1,52 @@
+---
+config:
+        layout: elk
+---
+erDiagram
+    direction TB
+    classDef default fill:#00808022,stroke:#00ced1,stroke-width:2px
+    classDef junction fill:#88888833,stroke:#888888
+    tasks {
+        INTEGER id PK
+        TEXT name
+        TEXT description
+        TIMESTAMP deadline
+        INTEGER parent_id FK
+        INTEGER project_id FK
+    }
+    tags {
+        INTEGER id PK
+        TEXT name
+        TEXT description
+    }
+    projects { 
+        INTEGER id PK
+        TEXT name
+        TEXT description
+    }
+    sessions {
+        INTEGER id PK
+        INTEGER task_id FK
+        TIMESTAMP start_at
+        TIMESTAMP updated_at
+        TIMESTAMP end_at
+    }
+    %% Junction Tables
+    task_tags:::junction {
+        INTEGER task_id FK
+        INTEGER tag_id FK
+    }
+    project_default_tags:::junction {
+        INTEGER project_id FK
+        INTEGER tag_id FK
+    }
+
+    tasks ||--o{ sessions : "sessions"
+    tasks }o..o| projects : "project of"
+    tasks }o..|| tasks : "subtask"
+    
+    tasks ||--o{ task_tags : "has"
+    tags ||--o{ task_tags : "assigned to"
+    
+    projects ||--o{ project_default_tags : "has"
+    tags ||--o{ project_default_tags : "default for"
