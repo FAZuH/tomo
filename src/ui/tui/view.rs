@@ -12,7 +12,6 @@ use crossterm::terminal::enable_raw_mode;
 use ratatui::prelude::*;
 
 use crate::config::Config;
-use crate::config::ConfigError;
 use crate::models::Pomodoro;
 use crate::ui::Update;
 use crate::ui::pages::settings::SettingsCmd;
@@ -129,29 +128,29 @@ impl TuiView {
 
         match input {
             Left | Char('h') => {
-                self.pomodoro =
+                (self.pomodoro, _) =
                     TimerUpdate::update(Subtract(Duration::from_secs(30)), self.pomodoro.clone());
             }
             Down | Char('j') => {
-                self.pomodoro =
+                (self.pomodoro, _) =
                     TimerUpdate::update(Subtract(Duration::from_secs(60)), self.pomodoro.clone());
             }
             Right | Char('l') => {
-                self.pomodoro =
+                (self.pomodoro, _) =
                     TimerUpdate::update(Add(Duration::from_secs(30)), self.pomodoro.clone());
             }
             Up | Char('k') => {
-                self.pomodoro =
+                (self.pomodoro, _) =
                     TimerUpdate::update(Add(Duration::from_secs(60)), self.pomodoro.clone());
             }
             Char(' ') => {
-                self.pomodoro = TimerUpdate::update(TogglePause, self.pomodoro.clone());
+                (self.pomodoro, _) = TimerUpdate::update(TogglePause, self.pomodoro.clone());
             }
             Enter => {
-                self.pomodoro = TimerUpdate::update(SkipSession, self.pomodoro.clone());
+                (self.pomodoro, _) = TimerUpdate::update(SkipSession, self.pomodoro.clone());
             }
             Backspace => {
-                self.pomodoro = TimerUpdate::update(ResetSession, self.pomodoro.clone());
+                (self.pomodoro, _) = TimerUpdate::update(ResetSession, self.pomodoro.clone());
             }
             Char('q') => self.router.navigate(Navigation::Quit),
             Char('s') => self.router.navigate(Navigation::GoTo(Page::Settings)),
@@ -242,17 +241,18 @@ impl TuiView {
     }
 
     fn save_settings(&mut self) {
-        let render = &mut self.renderer.settings;
-
+        use crate::info;
+        info!("Saving config...");
         let (model, cmd) = SettingsUpdate::update(SettingsMsg::SaveToDisk, self.config.clone());
         self.config = model;
 
         if let SettingsCmd::SavedToDisk(res) = cmd {
             match res {
                 Ok(_) => {},
-                Err(_) => {},
+                Err(_) => res.unwrap(),
             }
         }
+        info!("Saved config");
     }
 
     fn quit(&mut self) {
