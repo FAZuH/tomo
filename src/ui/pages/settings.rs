@@ -1,7 +1,8 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
-use crate::config::{Config, ConfigError};
+use crate::config::Config;
+use crate::config::ConfigError;
 use crate::ui::Update;
 
 pub const SETTINGS_VIEW_ITEMS: u32 = 13;

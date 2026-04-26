@@ -248,7 +248,7 @@ impl TuiView {
 
         if let SettingsCmd::SavedToDisk(res) = cmd {
             match res {
-                Ok(_) => {},
+                Ok(_) => {}
                 Err(_) => res.unwrap(),
             }
         }

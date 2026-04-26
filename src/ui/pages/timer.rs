@@ -14,7 +14,7 @@ pub enum TimerMsg {
 
 #[derive(Clone, Debug, Copy, PartialEq, Eq)]
 pub enum TimerCmd {
-    None
+    None,
 }
 
 pub struct TimerUpdate {}
