@@ -16,6 +16,7 @@ pub struct TuiSettingsRenderer {
     selected_idx: u32,
     editing: bool,
     edit_buffer: String,
+    has_unsaved_changes: bool,
 }
 
 impl TuiSettingsRenderer {
@@ -25,6 +26,7 @@ impl TuiSettingsRenderer {
             selected_idx: 0,
             editing: false,
             edit_buffer: String::new(),
+            has_unsaved_changes: false,
         }
     }
 
@@ -81,6 +83,10 @@ impl TuiSettingsRenderer {
         self.edit_buffer.pop();
     }
 
+    pub fn set_has_unsaved_changes(&mut self, state: bool) {
+        self.has_unsaved_changes = state;
+    }
+
     pub fn render(&mut self, frame: &mut Frame, config: &Config) {
         let area = frame.area();
         // Reserve space for scrollbar and padding
@@ -100,6 +106,10 @@ impl TuiSettingsRenderer {
         // Render title at top
         let title_area = Rect::new(0, 0, content_width, 4);
         self.render_title(&mut scroll_view, title_area);
+
+        // Render unsaved changes indicator in the spacing row between title and sections
+        let indicator_area = Rect::new(0, 4, content_width, 1);
+        self.render_unsaved_indicator(&mut scroll_view, indicator_area);
 
         // Render sections with proper spacing
         let mut y = 5u16; // Start after title + 1 row spacing
@@ -124,6 +134,19 @@ impl TuiSettingsRenderer {
             .centered()
             .build();
         scroll_view.render_widget(big_text, area);
+    }
+
+    fn render_unsaved_indicator(&self, scroll_view: &mut ScrollView, area: Rect) {
+        if !self.has_unsaved_changes {
+            return;
+        }
+        let line = Line::from(vec![Span::styled(
+            "● Unsaved changes",
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        )]);
+        scroll_view.render_widget(Paragraph::new(line), area);
     }
 
     /// Build sections from config, calculating layout and identifying editable items

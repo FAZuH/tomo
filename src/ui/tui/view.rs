@@ -30,6 +30,7 @@ pub struct TuiView {
     router: Router,
     pomodoro: Pomodoro,
     config: Config,
+    latest_config_save: Config,
     should_quit: bool,
     renderer: TuiRenderer,
     terminal: Terminal<CrosstermBackend<std::io::Stdout>>,
@@ -44,6 +45,7 @@ impl TuiView {
         Ok(Self {
             router: Router::new(Page::Timer),
             pomodoro,
+            latest_config_save: config.clone(),
             config,
             should_quit: false,
             renderer,
@@ -232,12 +234,16 @@ impl TuiView {
             10 => Some(SettingsMsg::SoundFocus(parse_path(&value))),
             11 => Some(SettingsMsg::SoundShort(parse_path(&value))),
             12 => Some(SettingsMsg::SoundLong(parse_path(&value))),
-            _ => None,
+            _ => return,
         };
 
         if let Some(m) = msg {
             (self.config, _) = SettingsUpdate::update(m, self.config.clone());
         }
+
+        self.renderer
+            .settings
+            .set_has_unsaved_changes(self.check_settings_updated());
     }
 
     fn save_settings(&mut self) {
@@ -246,10 +252,18 @@ impl TuiView {
 
         if let SettingsCmd::SavedToDisk(res) = cmd {
             match res {
-                Ok(_) => {}
+                Ok(_) => {
+                    self.renderer.settings.set_has_unsaved_changes(false);
+                    self.latest_config_save = self.config.clone();
+                }
                 Err(_) => res.unwrap(),
             }
         }
+    }
+
+    // Compare current config with when it was latest saved.
+    fn check_settings_updated(&self) -> bool {
+        self.config != self.latest_config_save
     }
 
     fn quit(&mut self) {
