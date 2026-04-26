@@ -1,115 +1,48 @@
 sequenceDiagram
     autonumber
-    participant U as User
-    participant App as App
-    participant TC as TimerController
-    participant SC as SettingsController
-    participant V as View
-    participant M as Model
+    participant V as View (Platform)
+    participant R as Router
+    participant TU as TimerUpdate
+    participant SU as SettingsUpdate
+    participant P as Pomodoro
+    participant C as Config
 
     rect rgb(180, 200, 220)
-        note right of App: INITIALIZATION
-        App->>App: AppBuilder::build()
-        activate App
-        App->>TC: new TimerController(view, model)
-        activate TC
-        TC->>M: new Pomodoro()
-        activate M
-        M-->>TC: model
-        deactivate M
-        TC->>V: new TuiTimerView()
-        activate V
-        V-->>TC: view
-        deactivate V
-        TC-->>App: timer_controller
-        deactivate TC
-        App->>SC: new SettingsController(view, config)
-        activate SC
-        SC->>M: Config
-        activate M
-        M-->>SC: config
-        deactivate M
-        SC->>V: new TuiSettingsView()
-        activate V
-        V-->>SC: view
-        deactivate V
-        SC-->>App: settings_controller
-        deactivate SC
-        App-->>App: app
-        deactivate App
+        note right of V: INITIALIZATION
+        V->>R: Router::default()
+        activate R
+        R-->>V: router
+        deactivate R
     end
 
     rect rgb(180, 220, 190)
-        note right of App: TICK CYCLE
-        loop Every tick
-            App->>TC: tick()
-            activate TC
-            TC->>M: model.update()
-            activate M
-            M-->>TC: Ok
-            deactivate M
-            TC-->>App: Ok
-            deactivate TC
+        note right of V: EVENT LOOP
+        loop Every event (tick, input)
+            opt On Tick
+                V->>P: tick()
+            end
+            opt On Timer Input
+                V->>V: Map input to TimerMsg
+                V->>TU: update(msg, pomodoro)
+                activate TU
+                TU->>P: apply msg logic
+                TU-->>V: updated_pomodoro
+                deactivate TU
+            end
+            opt On Settings Input
+                V->>V: Map input to SettingsMsg
+                V->>SU: update(msg, config)
+                activate SU
+                SU->>C: apply msg logic
+                SU-->>V: updated_config
+                deactivate SU
+            end
+            opt On Navigation Input
+                V->>R: navigate(Navigation)
+                activate R
+                R->>R: update active_page
+                R-->>V: return
+                deactivate R
+            end
         end
-    end
-
-    rect rgb(220, 180, 190)
-        note right of App: INPUT → RENDER CYCLE (Timer)
-        note over U, App: Platform layer converts Input to TimerActions
-        U->>App: TimerActions
-        App->>TC: handle(action)
-        activate TC
-        TC->>M: mutate model
-        activate M
-        M-->>TC: Ok
-        deactivate M
-        TC-->>App: Ok(Navigation)
-        deactivate TC
-
-        App->>TC: render()
-        activate TC
-        TC->>V: render(TimerViewState)
-        activate V
-        V-->>TC: Vec~TimerRenderCommand~
-        deactivate V
-        TC-->>App: Vec~TimerRenderCommand~
-        deactivate TC
-    end
-
-    rect rgb(220, 180, 190)
-        note right of App: INPUT → RENDER CYCLE (Settings)
-        note over U, App: Platform layer converts Input to SettingsActions
-        U->>App: SettingsActions
-        App->>SC: handle(action)
-        activate SC
-        SC->>M: mutate config
-        activate M
-        M-->>SC: Ok
-        deactivate M
-        SC-->>App: Ok(Navigation)
-        deactivate SC
-
-        App->>SC: render()
-        activate SC
-        SC->>V: render(SettingsViewState)
-        activate V
-        V-->>SC: Vec~SettingsRenderCommand~
-        deactivate V
-        SC-->>App: Vec~SettingsRenderCommand~
-        deactivate SC
-    end
-
-    rect rgb(220, 180, 190)
-        note right of App: NAVIGATION
-        note over U, App: Via TimerActions::Navigate or SettingsActions::Navigate
-        U->>App: Navigation action
-        alt Timer page
-            App->>TC: handle(Navigate)
-            TC-->>App: Ok(Navigation::GoTo(Page))
-        else Settings page
-            App->>SC: handle(Navigate)
-            SC-->>App: Ok(Navigation::GoTo(Page))
-        end
-        App->>App: navigate(Navigation)
-        App->>App: active_page = page
     end
