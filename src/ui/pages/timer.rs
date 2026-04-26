@@ -12,6 +12,11 @@ pub enum TimerMsg {
     ResetSession,
 }
 
+#[derive(Clone, Debug, Copy, PartialEq, Eq)]
+pub enum TimerCmd {
+    None
+}
+
 pub struct TimerUpdate {}
 
 impl TimerUpdate {
@@ -23,8 +28,9 @@ impl TimerUpdate {
 impl Update for TimerUpdate {
     type Msg = TimerMsg;
     type Model = Pomodoro;
+    type Cmd = TimerCmd;
 
-    fn update(msg: Self::Msg, mut model: Self::Model) -> Self::Model {
+    fn update(msg: Self::Msg, mut model: Self::Model) -> (Self::Model, Self::Cmd) {
         use TimerMsg::*;
         match msg {
             Add(dur) => model.add(dur),
@@ -33,6 +39,6 @@ impl Update for TimerUpdate {
             SkipSession => model.skip(),
             ResetSession => model.reset(),
         }
-        model
+        (model, TimerCmd::None)
     }
 }

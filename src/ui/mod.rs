@@ -5,7 +5,8 @@ pub mod tui;
 pub trait Update {
     type Model;
     type Msg;
-    fn update(msg: Self::Msg, model: Self::Model) -> Self::Model;
+    type Cmd;
+    fn update(msg: Self::Msg, model: Self::Model) -> (Self::Model, Self::Cmd);
 }
 
 #[derive(Debug, thiserror::Error)]

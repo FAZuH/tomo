@@ -12,8 +12,10 @@ use crossterm::terminal::enable_raw_mode;
 use ratatui::prelude::*;
 
 use crate::config::Config;
+use crate::config::ConfigError;
 use crate::models::Pomodoro;
 use crate::ui::Update;
+use crate::ui::pages::settings::SettingsCmd;
 use crate::ui::pages::settings::SettingsMsg;
 use crate::ui::pages::settings::SettingsUpdate;
 use crate::ui::pages::timer::TimerMsg;
@@ -174,13 +176,13 @@ impl TuiView {
             Down | Char('j') => settings.select_down(),
             Enter => {
                 if SettingsMsg::is_toggle_index(settings.selected_idx()) {
-                    self.save_settings()?
+                    self.update_settings()
                 } else {
                     settings.start_editing()
                 }
             }
             Char(' ') if SettingsMsg::is_toggle_index(settings.selected_idx()) => {
-                self.save_settings()?
+                self.update_settings()
             }
             Esc => self.router.navigate(Navigation::GoTo(Page::Timer)),
             Char('q') => self.quit(),
@@ -196,7 +198,7 @@ impl TuiView {
         use Input::*;
         match input {
             Esc => settings.cancel_editing(),
-            Enter => self.save_settings()?,
+            Enter => self.update_settings(),
             Backspace => settings.pop_char(),
             Char(c) if c.is_ascii_digit() || c == ':' => {
                 settings.push_char(c);
@@ -207,7 +209,7 @@ impl TuiView {
         Ok(())
     }
 
-    fn save_settings(&mut self) -> Result<(), TuiError> {
+    fn update_settings(&mut self) {
         let settings = &mut self.renderer.settings;
         let selected_idx = settings.selected_idx();
         let value = settings.edit_buffer().to_string();
@@ -234,10 +236,9 @@ impl TuiView {
         };
 
         if let Some(m) = msg {
-            self.config = SettingsUpdate::update(m, self.config.clone());
+            (self.config, _) = SettingsUpdate::update(m, self.config.clone());
         }
 
-        Ok(())
     }
 
     fn quit(&mut self) {

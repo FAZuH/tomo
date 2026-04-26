@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
-use crate::config::Config;
+use crate::config::{Config, ConfigError};
 use crate::ui::Update;
 
 pub const SETTINGS_VIEW_ITEMS: u32 = 13;
@@ -25,13 +25,20 @@ pub enum SettingsMsg {
     SoundFocus(Option<PathBuf>),
     SoundShort(Option<PathBuf>),
     SoundLong(Option<PathBuf>),
+    // Other
+    SaveToDisk,
 }
 
 impl SettingsMsg {
     pub fn is_toggle_index(index: u32) -> bool {
         (4..=6).contains(&index)
     }
+}
 
+#[derive(Debug)]
+pub enum SettingsCmd {
+    None,
+    SavedToDisk(Result<(), ConfigError>),
 }
 
 pub struct SettingsUpdate {}
@@ -45,12 +52,14 @@ impl SettingsUpdate {
 impl Update for SettingsUpdate {
     type Msg = SettingsMsg;
     type Model = Config;
+    type Cmd = SettingsCmd;
 
-    fn update(msg: Self::Msg, mut model: Self::Model) -> Self::Model {
+    fn update(msg: Self::Msg, mut model: Self::Model) -> (Self::Model, Self::Cmd) {
         use SettingsMsg::*;
         let timer = &mut model.pomodoro.timer;
         let hook = &mut model.pomodoro.hook;
         let sound = &mut model.pomodoro.sound;
+        let mut cmd = SettingsCmd::None;
         match msg {
             // Timer
             TimerFocus(d) => timer.focus = d,
@@ -68,7 +77,8 @@ impl Update for SettingsUpdate {
             SoundFocus(p) => sound.focus = p,
             SoundShort(p) => sound.short = p,
             SoundLong(p) => sound.long = p,
+            SaveToDisk => cmd = SettingsCmd::SavedToDisk(model.save()),
         }
-        model
+        (model, cmd)
     }
 }
