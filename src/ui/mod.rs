@@ -1,32 +1,12 @@
-pub mod app;
-pub mod controller;
-pub mod error;
+pub mod pages;
+pub mod router;
 pub mod tui;
-pub mod view;
 
-#[derive(Clone, Debug, Copy, PartialEq, Eq)]
-pub enum Page {
-    Timer,
-    Settings,
+pub trait Update {
+    type Model;
+    type Msg;
+    fn update(msg: Self::Msg, model: Self::Model) -> Self::Model;
 }
 
-#[derive(Clone, Debug, Copy, PartialEq, Eq)]
-pub enum Navigation {
-    Quit,
-    Stay,
-    GoTo(Page),
-}
-
-#[derive(Clone, Debug, Copy, PartialEq, Eq)]
-pub enum Input {
-    Up,
-    Down,
-    Left,
-    Right,
-    Enter,
-    Esc,
-    Backspace,
-    Char(char),
-    Ctrl(char),
-    Shift(char),
-}
+#[derive(Debug, thiserror::Error)]
+pub enum UiError {}
