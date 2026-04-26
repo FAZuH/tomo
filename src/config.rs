@@ -43,7 +43,7 @@ impl Config {
     pub fn save(&self) -> Result<(), ConfigError> {
         let conf_dir = utils::conf_dir();
         let conf_path = conf_dir.join("config.yaml");
-        let file = fs::File::open(&conf_path)?;
+        let file = fs::File::create(&conf_path)?;
         serde_yml::to_writer(&file, self)?;
         info!("Configuration saved successfully");
         Ok(())
