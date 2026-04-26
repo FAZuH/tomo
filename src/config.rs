@@ -11,7 +11,7 @@ use crate::debug;
 use crate::info;
 use crate::utils;
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct Config {
     pub pomodoro: PomodoroConfig,
@@ -43,14 +43,14 @@ impl Config {
     pub fn save(&self) -> Result<(), ConfigError> {
         let conf_dir = utils::conf_dir();
         let conf_path = conf_dir.join("config.yaml");
-        let file = fs::File::open(&conf_path)?;
+        let file = fs::File::create(&conf_path)?;
         serde_yml::to_writer(&file, self)?;
         info!("Configuration saved successfully");
         Ok(())
     }
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct PomodoroConfig {
     pub timer: PomodoroTimerConfig,
@@ -58,7 +58,7 @@ pub struct PomodoroConfig {
     pub sound: PomodoroSoundConfig,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct PomodoroTimerConfig {
     #[serde(with = "duration_as_secs")]
@@ -108,7 +108,7 @@ impl Default for PomodoroTimerConfig {
     }
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct PomodoroHookConfig {
     pub focus: String,
@@ -116,7 +116,7 @@ pub struct PomodoroHookConfig {
     pub long: String,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct PomodoroSoundConfig {
     pub focus: Option<PathBuf>,

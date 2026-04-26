@@ -58,10 +58,6 @@ impl Pomodoro {
         Ok(())
     }
 
-    /// No-op. Remaining and total time are computed on-the-fly from the
-    /// anchor instant, eliminating drift.
-    pub fn update(&mut self) {}
-
     /// Adds given duration to session's remaining time.
     pub fn add(&mut self, duration: Duration) {
         self.frozen_remaining += duration;
@@ -398,30 +394,6 @@ mod tests {
 
         let total = pomo.total_time().as_secs();
         assert!(total >= 1, "Expected total_time >= 1, got {}", total);
-    }
-
-    #[test]
-    fn test_anchor_no_drift() {
-        let past = Instant::now().checked_sub(Duration::from_secs(10)).unwrap();
-
-        let mut pomo = Pomodoro {
-            frozen_remaining: Duration::from_secs(67),
-            anchor: Some(past),
-            accumulated: Duration::from_secs(5),
-            running: true,
-            ..Default::default()
-        };
-
-        for _ in 0..100 {
-            pomo.update();
-        }
-
-        let remaining = pomo.remaining_time().as_secs();
-        assert!(remaining <= 57, "Expected <= 57, got {}", remaining);
-        assert!(remaining >= 56, "Expected >= 56, got {}", remaining);
-
-        let total = pomo.total_time().as_secs();
-        assert!(total >= 15, "Expected total_time >= 15, got {}", total);
     }
 
     #[test]

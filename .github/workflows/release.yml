@@ -31,21 +31,33 @@ jobs:
       - name: Install changelog dependencies
         run: npm install conventional-changelog-conventionalcommits@7.0.2
 
-      - name: Create Changelog
+      - name: Generate Changelog (dry run)
         id: changelog
-        uses: TriPSs/conventional-changelog-action@v5.2.1
+        uses: TriPSs/conventional-changelog-action@v6
         with:
+          skip-commit: true
+          skip-tag: true
           github-token: ${{ secrets.PRIVATE_TOKEN }}
-          git-user-name: "faz-bot"
-          git-user-email: "mail@fazuh.com"
-          pre-commit: ./.github/.pre-commit.js
           config-file-path: ./.github/.config.js
           version-file: ./version.json
           preset: conventionalcommits
           skip-version-file: true
           skip-git-pull: true
           skip-on-empty: false
-          release-count: 5
+
+      - name: Bump Cargo.toml version
+        if: ${{ steps.changelog.outputs.skipped != 'true' }}
+        run: |
+          VERSION=${{ steps.changelog.outputs.tag }}
+          VERSION=${VERSION#v}
+          sed -i "0,/^version = \".*\"/{s/^version = \".*\"/version = \"$VERSION\"/}" Cargo.toml
+
+      - name: Upload patched Cargo.toml
+        if: ${{ steps.changelog.outputs.skipped != 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: patched-cargo-toml
+          path: Cargo.toml
 
   build:
     name: Build Binary (${{ matrix.target }})
@@ -74,8 +86,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Download patched Cargo.toml
+        uses: actions/download-artifact@v4
         with:
-          ref: ${{ needs.changelog.outputs.tag }}
+          name: patched-cargo-toml
+          path: .
 
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
@@ -89,7 +105,14 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get update
-          sudo apt-get install -y --fix-missing libfontconfig1-dev
+          sudo apt-get install -y --fix-missing libfontconfig1-dev libsqlite3-dev
+
+      - name: Install SQLite (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          vcpkg install sqlite3:x64-windows-static
+          echo "SQLITE3_LIB_DIR=C:/vcpkg/installed/x64-windows-static/lib" >> $env:GITHUB_ENV
+          echo "VCPKGRS_DYNAMIC=0" >> $env:GITHUB_ENV
 
       - name: Build Package
         run: cargo build --release --target ${{ matrix.target }}
@@ -113,9 +136,48 @@ jobs:
           name: ${{ matrix.asset_name }}
           path: artifacts/${{ matrix.asset_name }}
 
+  publish-changelog:
+    name: Publish Changelog Commit
+    needs: [changelog, build]
+    if: ${{ needs.changelog.outputs.skipped != 'true' }}
+    outputs:
+      tag: ${{ steps.commit.outputs.tag }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set Up version.json
+        run: echo "{\"version\":\"$(git describe --tags --abbrev=0 2>/dev/null || echo '0.0.0')\"}" > version.json
+
+      - name: Download patched Cargo.toml
+        uses: actions/download-artifact@v4
+        with:
+          name: patched-cargo-toml
+          path: .
+
+      - name: Install changelog dependencies
+        run: npm install conventional-changelog-conventionalcommits@7.0.2
+
+      - name: Commit, Tag, Push
+        id: commit
+        uses: TriPSs/conventional-changelog-action@v6
+        with:
+          github-token: ${{ secrets.PRIVATE_TOKEN }}
+          git-user-name: "faz-bot"
+          git-user-email: "mail@fazuh.com"
+          config-file-path: ./.github/.config.js
+          version-file: ./version.json
+          preset: conventionalcommits
+          skip-version-file: true
+          skip-git-pull: true
+          skip-on-empty: false
+
   release-github:
     name: Release to GitHub
-    needs: [changelog, build]
+    needs: [changelog, build, publish-changelog]
     if: ${{ needs.changelog.outputs.skipped != 'true' }}
     runs-on: ubuntu-latest
     steps:
@@ -137,7 +199,7 @@ jobs:
         id: release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ needs.changelog.outputs.tag }}
+          tag_name: ${{ needs.publish-changelog.outputs.tag }}
           body: ${{ needs.changelog.outputs.changelog }}
           files: release/*
 
@@ -146,7 +208,7 @@ jobs:
         with:
           webhook-url: ${{ secrets.DISCORD_RELEASE_WEBHOOK_URL }}
           embed-color: "9498256"
-          embed-title: "tomo ${{ needs.changelog.outputs.tag }}"
+          embed-title: "tomo ${{ needs.publish-changelog.outputs.tag }}"
           embed-description: ${{ needs.changelog.outputs.changelog }}
           embed-url: ${{ steps.release.outputs.url }}
           embed-timestamp: ${{ github.event.head_commit.timestamp }}

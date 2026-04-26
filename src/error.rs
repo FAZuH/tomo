@@ -1,6 +1,6 @@
 use crate::cli::CliArgumentError;
 use crate::config::ConfigError;
-use crate::ui::error::UiError;
+use crate::ui::UiError;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {

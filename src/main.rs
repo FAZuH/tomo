@@ -3,7 +3,7 @@ use tomo::cli::Cli;
 use tomo::config::Config;
 use tomo::error::Error;
 use tomo::models::Pomodoro;
-use tomo::ui::tui::TuiRunner;
+use tomo::ui::tui::TuiView;
 
 fn main() -> Result<(), Error> {
     let cli = Cli::parse();
@@ -11,7 +11,7 @@ fn main() -> Result<(), Error> {
 
     let mut model = create_model(&cli, &conf);
     model.start().unwrap();
-    let mut runner = TuiRunner::new(conf, model).unwrap();
+    let mut runner = TuiView::new(conf, model).unwrap();
     runner.run().unwrap();
 
     Ok(())

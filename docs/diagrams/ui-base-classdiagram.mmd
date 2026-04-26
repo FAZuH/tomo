@@ -19,78 +19,52 @@ classDiagram
         Quit
     }
 
-    class App:::controller {
-        -active_page : Page
-        -timer : TimerController
-        -settings : SettingsController
-        +builder() AppBuilder
-        +handle_timer(action: TimerActions) Result~Navigation, AppError~
-        +handle_settings(action: SettingsActions) Result~Navigation, AppError~
-        +tick() Result~void, AppError~
-        +render() Vec~RenderCommand~
+    class Router:::controller {
+        -active_page : Option~Page~
         +navigate(nav: Navigation)
-        +active_page() Page
+        +active_page() Option~Page~
     }
 
-    class AppBuilder:::controller {
-        -config : Option~Config~
-        -pomodoro : Option~Pomodoro~
-        -page : Option~Page~
-        -timer_view : Option~Box~dyn TimerView~~
-        -settings_view : Option~Box~dyn SettingsView~~
-        +build() Result~App, AppBuildError~
+    class Update~Msg, Model~:::controller {
+        <<trait>>
+        +update(msg: Msg, model: Model) Model
     }
-
-    App ..> AppBuilder : creates
-    App --> Page : active_page
-    App *-- TimerController
-    App *-- SettingsController
-    App --> Navigation : navigates
-    App --> RenderCommand : creates
 
     namespace Timer {
-        class TimerController:::controller {
-            -view : Box~dyn TimerView~
-            -model : Pomodoro
-            +new(view, model) TimerController
-            +handle(action: TimerActions) Result~Navigation, PomodoroError~
-            +tick()
-            +render() Vec~TimerRenderCommand~
+        class TimerUpdate:::controller {
+            +update(msg: TimerMsg, model: Pomodoro) Pomodoro
         }
 
-        class TimerView:::view {
-            <<interface>>
-            +render(state: TimerViewState) Vec~TimerRenderCommand~
-        }
-
-        class TimerViewState:::state {
-            +remaining : Duration
-            +total : Duration
-            +state : PomodoroState
-            +running : bool
-            +long_interval : u32
-            +total_sessions : u32
-            +focus_sessions : u32
-            +progress_perc : f64
-        }
-
-        class TimerActions:::action {
+        class TimerMsg:::action {
             <<enumeration>>
             Add(Duration)
             Subtract(Duration)
             TogglePause
             SkipSession
             ResetSession
-            Navigate(Navigation)
+        }
+    }
+
+    namespace Settings {
+        class SettingsUpdate:::controller {
+            +update(msg: SettingsMsg, model: Config) Config
         }
 
-        class TimerRenderCommand:::renderCmd {
+        class SettingsMsg:::action {
             <<enumeration>>
-            State(PomodoroState)
-            Timer(remaining: Duration)
-            PauseIndicator(bool)
-            Stats(remaining, total, long_interval, total_sessions, focus_sessions)
-            Progress(f64)
+            TimerFocus(Duration)
+            TimerShort(Duration)
+            TimerLong(Duration)
+            TimerLongInterval(u32)
+            TimerAutoFocus
+            TimerAutoShort
+            TimerAutoLong
+            HookFocus(String)
+            HookShort(String)
+            HookLong(String)
+            SoundFocus(Option~PathBuf~)
+            SoundShort(Option~PathBuf~)
+            SoundLong(Option~PathBuf~)
         }
     }
 
@@ -117,13 +91,6 @@ classDiagram
             LongBreak
         }
 
-        class PomodoroError:::error {
-            <<enumeration>>
-            Running
-            NotRunning
-            UnexpectedState(String)
-        }
-
         class Config:::model {
             +pomodoro : PomodoroConfig
             +load() Result~Config, ConfigError~
@@ -131,96 +98,17 @@ classDiagram
         }
     }
 
-    namespace Settings {
-        class SettingsController:::controller {
-            -view : Box~dyn SettingsView~
-            -config : Config
-            +new(view, config) SettingsController
-            +handle(action: SettingsActions) Result~Navigation, PomodoroError~
-            +render() Vec~SettingsRenderCommand~
-        }
+    Router --> Page : active_page
+    Router --> Navigation : handles
 
-        class SettingsView:::view {
-            <<interface>>
-            +render(state: SettingsViewState) Vec~SettingsRenderCommand~
-        }
+    TimerUpdate ..|> Update
+    SettingsUpdate ..|> Update
 
-        class SettingsViewState:::state {
-            +timer_focus : Duration
-            +timer_short : Duration
-            +timer_long : Duration
-            +timer_long_interval : u32
-            +timer_auto_focus : bool
-            +timer_auto_short : bool
-            +timer_auto_long : bool
-            +hook_focus : String
-            +hook_short : String
-            +hook_long : String
-            +sound_focus : Option~PathBuf~
-            +sound_short : Option~PathBuf~
-            +sound_long : Option~PathBuf~
-        }
-
-        class SettingsActions:::action {
-            <<enumeration>>
-            TimerFocus(Duration)
-            TimerShort(Duration)
-            TimerLong(Duration)
-            TimerLongInterval(u32)
-            TimerAutoFocus(bool)
-            TimerAutoShort(bool)
-            TimerAutoLong(bool)
-            HookFocus(String)
-            HookShort(String)
-            HookLong(String)
-            SoundFocus(Option~PathBuf~)
-            SoundShort(Option~PathBuf~)
-            SoundLong(Option~PathBuf~)
-            Navigate(Navigation)
-        }
-
-        class SectionLayout:::renderCmd {
-            <<enumeration>>
-            Vertical
-            Horizontal
-        }
-
-        class SettingsRenderCommand:::renderCmd {
-            <<enumeration>>
-            Title
-            Section(label: String, children: Vec~Self~)
-            SubSection(label: String, layout: SectionLayout, children: Vec~Self~)
-            Input(label: String, value: String)
-            Checkbox(label: String, value: bool)
-        }
-    }
-
-    class RenderCommand:::renderCmd {
-        <<enumeration>>
-        Timer(Vec~TimerRenderCommand~)
-        Settings(Vec~SettingsRenderCommand~)
-    }
-
-    TimerController --> TimerRenderCommand : returns to App
-    TimerView --> TimerRenderCommand : creates
-    TimerController --> TimerActions : handles
-
-    SettingsController --> SettingsRenderCommand : returns to App
-    SettingsView --> SettingsRenderCommand : creates
-    SettingsController --> SettingsActions : handles
-    SettingsRenderCommand --> SectionLayout : layout
-
-    TimerController *-- Pomodoro : model
-    TimerController o-- TimerView : calls render()
-
-    SettingsController *-- Config : config
-    SettingsController o-- SettingsView : calls render()
-
+    TimerUpdate ..> Pomodoro : mutates
+    TimerUpdate ..> TimerMsg : receives
+    SettingsUpdate ..> Config : mutates
+    SettingsUpdate ..> SettingsMsg : receives
     Pomodoro ..> PomodoroState : state
-    Pomodoro ..> PomodoroError : returns
-
-    TimerView ..> TimerViewState : reads
-    SettingsView ..> SettingsViewState : reads
 
     classDef view fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px,color:#000
     classDef controller fill:#bbdefb,stroke:#1565c0,stroke-width:2px,color:#000

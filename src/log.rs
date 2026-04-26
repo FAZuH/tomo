@@ -84,7 +84,7 @@ macro_rules! debug {
 
 pub fn log_level() -> u8 {
     *LOG_LEVEL.get_or_init(|| {
-        match std::env::var("FORGOR_LOG")
+        match std::env::var("TOMO_LOG")
             .map(|v| v.to_ascii_lowercase())
             .as_deref()
         {

@@ -1,159 +1,48 @@
 sequenceDiagram
     autonumber
     participant U as User
-    participant TR as TuiRunner
-    participant A as App
-    participant TC as TimerController
-    participant SC as SettingsController
-    participant TV as TuiTimerView
-    participant SV as TuiSettingsView
-    participant TRen as TuiRenderer
-    participant TS as TuiSettingsRenderer
+    participant V as TuiView
+    participant TU as TimerUpdate
+    participant SU as SettingsUpdate
+    participant TR as TuiRenderer
 
     rect rgb(180, 200, 220)
-        note right of TR: INITIALIZATION
-        TR->>TR: enable_raw_mode() + EnterAlternateScreen
-        TR->>TR: Terminal::new(CrosstermBackend)
-        TR->>TRen: TuiRenderer::new()
-        activate TRen
-        Note over TRen: Creates TuiTimerRenderer + TuiSettingsRenderer
-        TRen-->>TR: renderer
+        note right of V: INITIALIZATION
+        V->>V: enable_raw_mode()
+        V->>TR: TuiRenderer::new()
+        activate TR
+        TR-->>V: renderer
+        deactivate TR
     end
 
     rect rgb(180, 220, 190)
-        note right of TR: MAIN LOOP (100ms tick)
+        note right of V: MAIN LOOP (TICK)
         loop Until Quit
-            TR->>A: tick()
-            activate A
-            A->>TC: tick()
-            activate TC
-            TC->>TC: model.update()
-            TC-->>A: Ok
-            deactivate TC
-            A-->>TR: Ok
-            deactivate A
-
-            TR->>A: render()
-            activate A
-            alt Page::Timer
-                A->>TC: render()
-                activate TC
-                TC->>TV: render(TimerViewState)
-                activate TV
-                TV-->>TC: Vec~TimerRenderCommand~
-                deactivate TV
-                TC-->>A: Vec~TimerRenderCommand~
-                deactivate TC
-                A-->>TR: RenderCommand::Timer(cmds)
-            else Page::Settings
-                A->>SC: render()
-                activate SC
-                SC->>SV: render(SettingsViewState)
-                activate SV
-                SV-->>SC: Vec~SettingsRenderCommand~
-                deactivate SV
-                SC-->>A: Vec~SettingsRenderCommand~
-                deactivate SC
-                A-->>TR: RenderCommand::Settings(cmds)
+            V->>V: pomodoro.tick()
+            
+            opt Needs Redraw
+                V->>TR: flush(frame, router, pomodoro, config)
+                activate TR
+                TR-->>V: frame drawn
+                deactivate TR
+                V->>V: terminal.draw()
             end
-            deactivate A
 
-            TR->>TRen: flush(frame, commands)
-            activate TRen
-            alt Timer commands
-                TRen->>TRen: TuiTimerRenderer::render(frame, cmds)
-                Note over TRen: Layout splits frame.area() then renders state, timer, progress_bar, stats, shortcuts
-            else Settings commands
-                TRen->>TS: render(frame, cmds)
-                activate TS
-                Note over TS: 1. Apply internal selection state to commands<br/>2. Flatten → RenderRow list with is_selected flags<br/>3. Create ScrollView, render with highlights
-                TS-->>TRen: frame drawn
-                deactivate TS
-            end
-            TRen-->>TR: frame drawn
-            deactivate TRen
-
-            TR->>TR: terminal.draw()
-        end
-    end
-
-    rect rgb(220, 180, 190)
-        note right of TR: INPUT HANDLING (Timer)
-        TR->>TR: poll KeyEvent (100ms)
-        U->>TR: Key press
-        TR->>TR: KeyEvent → Input
-
-        alt Timer page
-            TR->>TR: TimerInputMapper::into_action(Input)
-            activate TR
-            TR-->>TR: Option~TimerActions~
-            deactivate TR
-            opt Action produced
-                TR->>A: handle_timer(TimerActions)
-                activate A
-                A->>TC: handle(action)
-                activate TC
-                alt Navigation action
-                    TC-->>A: Ok(Navigation::GoTo(Settings) or Quit)
-                else State mutation
-                    TC->>TC: model.mutate()
-                    TC-->>A: Ok(Navigation::Stay)
+            V->>V: poll input
+            opt Has Input
+                alt Page::Timer
+                    V->>TU: update(TimerMsg, pomodoro)
+                    activate TU
+                    TU-->>V: new_pomodoro
+                    deactivate TU
+                else Page::Settings
+                    V->>SU: update(SettingsMsg, config)
+                    activate SU
+                    SU-->>V: new_config
+                    deactivate SU
+                else Navigation
+                    V->>V: router.navigate(GoTo or Quit)
                 end
-                deactivate TC
-                A-->>TR: Ok(Navigation)
-                deactivate A
             end
         end
-    end
-
-    rect rgb(220, 180, 190)
-        note right of TR: INPUT HANDLING (Settings)
-        note over TR, TS: Settings input handled DIRECTLY on renderer
-        
-        TR->>TR: poll KeyEvent (100ms)
-        U->>TR: Key press (Settings page)
-        TR->>TR: KeyEvent → Input
-
-        alt Navigation (Up/Down/j/k)
-            TR->>TS: select_up() / select_down()
-            Note over TS: Mutates internal selected_idx only
-        else Start editing (Enter)
-            TR->>TS: start_editing()
-            Note over TS: Sets editing=true, clears buffer
-        else Type while editing
-            TR->>TS: push_char(c) / pop_char()
-            Note over TS: Mutates edit_buffer
-        else Commit edit (Enter while editing)
-            TR->>TR: commit_settings_edit(renderer)
-            activate TR
-            TR->>TS: get selected_idx + edit_buffer
-            TR->>TS: cancel_editing()
-            TR->>TR: build SettingsActions from buffer
-            TR-->>TR: Option~SettingsActions~
-            deactivate TR
-            opt Action produced
-                TR->>A: handle_settings(SettingsActions)
-                activate A
-                A->>SC: handle(action)
-                activate SC
-                SC->>SC: config.mutate()
-                SC-->>A: Ok(Navigation)
-                deactivate SC
-                A-->>TR: Ok(Navigation)
-                deactivate A
-            end
-        else Cancel edit (Esc while editing)
-            TR->>TS: cancel_editing()
-        else Navigate away (Esc)
-            TR->>A: navigate(GoTo(Timer))
-        else Quit (q)
-            TR->>A: handle_settings(Navigate(Quit))
-        end
-    end
-
-    rect rgb(220, 180, 190)
-        note right of TR: CLEANUP
-        TR->>TR: disable_raw_mode()
-        TR->>TR: LeaveAlternateScreen
-        TR->>TR: show_cursor()
     end
