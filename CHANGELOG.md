@@ -1,3 +1,16 @@
+## [0.1.4](https://github.com/FAZuH/tomo/compare/v0.1.3...v0.1.4) (2026-04-26)
+
+
+### feat
+
+* **tui:** Add settings save by 's' shortcut ([9bd3f51](https://github.com/FAZuH/tomo/commit/9bd3f512c13c6683410537cd1a50b5555090a5d3))
+* **tui:** Add unsaved changes indicator to settings page ([a2b65cd](https://github.com/FAZuH/tomo/commit/a2b65cd145914181db92c7c84debf6cd6bf9ff8d))
+
+
+### refactor
+
+* Rename logging var to TOMO_LOG [no ci] ([d825181](https://github.com/FAZuH/tomo/commit/d825181c519b8b29b5834863f90ae1e689fde568))
+
 ## [0.1.3](https://github.com/FAZuH/tomo/compare/v0.1.2...v0.1.3) (2026-04-25)
 
 
