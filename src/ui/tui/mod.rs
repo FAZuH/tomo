@@ -1,19 +1,13 @@
 pub mod input;
 pub mod renderer;
-pub mod runner;
 pub mod view;
 
-pub use runner::TuiRunner;
-
-use crate::ui::app::AppError;
+pub use view::TuiView;
 
 #[derive(Debug, thiserror::Error)]
 pub enum TuiError {
     #[error(transparent)]
     Io(#[from] std::io::Error),
-
-    #[error(transparent)]
-    App(#[from] AppError),
 
     #[error("Error during initialization: {0}")]
     InitializeError(String),

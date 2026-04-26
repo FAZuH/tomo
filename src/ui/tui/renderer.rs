@@ -16,11 +16,12 @@ use tui_widgets::scrollview::ScrollView;
 use tui_widgets::scrollview::ScrollViewState;
 use tui_widgets::scrollview::ScrollbarVisibility;
 
+use crate::config::Config;
+use crate::models::pomodoro::Pomodoro;
 use crate::models::pomodoro::PomodoroState;
-use crate::ui::view::RenderCommand;
-use crate::ui::view::SETTINGS_VIEW_ITEMS;
-use crate::ui::view::SettingsRenderCommand;
-use crate::ui::view::TimerRenderCommand;
+use crate::ui::pages::settings::SETTINGS_VIEW_ITEMS;
+use crate::ui::router::Page;
+use crate::ui::router::Router;
 use crate::utils;
 
 pub struct TuiTimerRenderer {
@@ -35,61 +36,32 @@ impl TuiTimerRenderer {
             paused_p: Self::paused_paragraph(),
         }
     }
-    fn render(&self, frame: &mut Frame, cmds: Vec<TimerRenderCommand>) {
-        let mut state = None;
-        let mut timer = None;
-        let mut pause_indicator = false;
-        let mut stats = None;
-        let mut progress = 0.0;
-
-        use TimerRenderCommand::*;
-        for cmd in &cmds {
-            match cmd {
-                State(s) => state = Some(*s),
-                Timer { remaining: r } => timer = Some(*r),
-                Progress(p) => progress = *p,
-                PauseIndicator(p) => pause_indicator = *p,
-                Stats { .. } => stats = Some(*cmd),
-            }
-        }
+    fn render(&self, frame: &mut Frame, pomodoro: &Pomodoro) {
+        let state = pomodoro.state();
+        let timer = pomodoro.remaining_time();
+        let pause_indicator = !pomodoro.is_running();
+        let total_time = pomodoro.session_duration();
+        let progress = if total_time.as_secs() > 0 {
+            1.0 - (timer.as_secs_f64() / total_time.as_secs_f64())
+        } else {
+            0.0
+        };
 
         let rows = self.layout.split(frame.area());
 
-        if let Some(state) = state {
-            self.state(frame, rows[1], state, pause_indicator);
-        }
+        self.state(frame, rows[1], state, pause_indicator);
 
-        if let Some(remaining) = timer {
-            self.timer(
-                frame,
-                rows[3],
-                &remaining,
-                state.map(session_color).unwrap_or(Color::White),
-            );
-        }
+        self.timer(frame, rows[3], &timer, session_color(state));
 
-        self.progress_bar(
+        self.progress_bar(frame, rows[4], progress, session_color(state));
+
+        self.stats(
             frame,
-            rows[4],
-            progress,
-            state.map(session_color).unwrap_or(Color::Cyan),
+            rows[6],
+            pomodoro.long_interval(),
+            pomodoro.total_sessions(),
+            pomodoro.focus_sessions(),
         );
-
-        if let Some(Stats {
-            long_interval,
-            total_sessions,
-            focus_sessions,
-            ..
-        }) = stats
-        {
-            self.stats(
-                frame,
-                rows[6],
-                long_interval,
-                total_sessions,
-                focus_sessions,
-            );
-        }
 
         self.shortcuts(frame, rows[8]);
     }
@@ -318,13 +290,13 @@ impl TuiSettingsRenderer {
         self.edit_buffer.pop();
     }
 
-    fn render(&mut self, frame: &mut Frame, cmds: Vec<SettingsRenderCommand>) {
+    fn render(&mut self, frame: &mut Frame, config: &Config) {
         let area = frame.area();
         // Reserve space for scrollbar and padding
         let content_width = area.width.saturating_sub(4).max(46);
 
         // Build sections with proper layout
-        let sections = self.build_sections(cmds, content_width);
+        let sections = self.build_sections(config, content_width);
 
         // Calculate total height: title (4) + spacing (1) + sections + padding (2)
         let sections_height: u16 = sections.iter().map(|s| s.height).sum();
@@ -363,19 +335,170 @@ impl TuiSettingsRenderer {
         scroll_view.render_widget(big_text, area);
     }
 
-    /// Build sections from commands, calculating layout and identifying editable items
-    fn build_sections(&self, cmds: Vec<SettingsRenderCommand>, width: u16) -> Vec<Section> {
+    /// Build sections from config, calculating layout and identifying editable items
+    fn build_sections(&self, config: &Config, _width: u16) -> Vec<Section> {
         let mut sections = Vec::new();
         let mut item_idx = 0u32;
 
-        for cmd in cmds {
-            if let SettingsRenderCommand::Section { label, children } = cmd {
-                let section_color = Self::section_color_from_label(&label);
-                let section =
-                    self.build_section(&label, children, width, section_color, &mut item_idx);
-                sections.push(section);
-            }
+        // Build Pomodoro Timer section
+        let timer_label = "󰔛 Pomodoro Timer";
+        let timer_color = Self::section_color_from_label(timer_label);
+        let mut timer_rows = Vec::new();
+
+        // Durations subsection
+        if !timer_rows.is_empty() {
+            timer_rows.push(SectionRow::Blank);
         }
+        timer_rows.push(SectionRow::SubSectionHeader("Durations".to_string()));
+        self.add_input_to_rows(
+            "Focus",
+            &format!("{}", config.pomodoro.timer.focus.as_secs() / 60),
+            &mut timer_rows,
+            &mut item_idx,
+        );
+        self.add_input_to_rows(
+            "Short Break",
+            &format!("{}", config.pomodoro.timer.short.as_secs() / 60),
+            &mut timer_rows,
+            &mut item_idx,
+        );
+        self.add_input_to_rows(
+            "Long Break",
+            &format!("{}", config.pomodoro.timer.long.as_secs() / 60),
+            &mut timer_rows,
+            &mut item_idx,
+        );
+
+        self.add_input_to_rows(
+            "Long Break Interval",
+            &format!("{}", config.pomodoro.timer.long_interval),
+            &mut timer_rows,
+            &mut item_idx,
+        );
+
+        // Auto Start subsection
+        if !timer_rows.is_empty() {
+            timer_rows.push(SectionRow::Blank);
+        }
+        timer_rows.push(SectionRow::SubSectionHeader("Auto Start".to_string()));
+        self.add_checkbox_to_rows(
+            "Focus",
+            config.pomodoro.timer.auto_focus,
+            &mut timer_rows,
+            &mut item_idx,
+        );
+        self.add_checkbox_to_rows(
+            "Short Break",
+            config.pomodoro.timer.auto_short,
+            &mut timer_rows,
+            &mut item_idx,
+        );
+        self.add_checkbox_to_rows(
+            "Long Break",
+            config.pomodoro.timer.auto_long,
+            &mut timer_rows,
+            &mut item_idx,
+        );
+
+        let timer_height = 2 + timer_rows.iter().map(|r| r.height()).sum::<u16>();
+        sections.push(Section {
+            title: timer_label.to_string(),
+            color: timer_color,
+            height: timer_height,
+            rows: timer_rows,
+        });
+
+        // Build Command Hooks section
+        let hooks_label = "󰛢 Command Hooks";
+        let hooks_color = Self::section_color_from_label(hooks_label);
+        let mut hooks_rows = Vec::new();
+
+        // Hooks subsection
+        if !hooks_rows.is_empty() {
+            hooks_rows.push(SectionRow::Blank);
+        }
+        hooks_rows.push(SectionRow::SubSectionHeader("Hooks".to_string()));
+        self.add_input_to_rows(
+            "Focus",
+            &config.pomodoro.hook.focus,
+            &mut hooks_rows,
+            &mut item_idx,
+        );
+        self.add_input_to_rows(
+            "Short Break",
+            &config.pomodoro.hook.short,
+            &mut hooks_rows,
+            &mut item_idx,
+        );
+        self.add_input_to_rows(
+            "Long Break",
+            &config.pomodoro.hook.long,
+            &mut hooks_rows,
+            &mut item_idx,
+        );
+
+        let hooks_height = 2 + hooks_rows.iter().map(|r| r.height()).sum::<u16>();
+        sections.push(Section {
+            title: hooks_label.to_string(),
+            color: hooks_color,
+            height: hooks_height,
+            rows: hooks_rows,
+        });
+
+        // Build Sounds section
+        let sounds_label = "󰕾 Sounds";
+        let sounds_color = Self::section_color_from_label(sounds_label);
+        let mut sounds_rows = Vec::new();
+
+        // Sound Files subsection
+        if !sounds_rows.is_empty() {
+            sounds_rows.push(SectionRow::Blank);
+        }
+        sounds_rows.push(SectionRow::SubSectionHeader("Sound Files".to_string()));
+        self.add_input_to_rows(
+            "Focus",
+            &config
+                .pomodoro
+                .sound
+                .focus
+                .as_ref()
+                .map(|p| p.display().to_string())
+                .unwrap_or_default(),
+            &mut sounds_rows,
+            &mut item_idx,
+        );
+        self.add_input_to_rows(
+            "Short Break",
+            &config
+                .pomodoro
+                .sound
+                .short
+                .as_ref()
+                .map(|p| p.display().to_string())
+                .unwrap_or_default(),
+            &mut sounds_rows,
+            &mut item_idx,
+        );
+        self.add_input_to_rows(
+            "Long Break",
+            &config
+                .pomodoro
+                .sound
+                .long
+                .as_ref()
+                .map(|p| p.display().to_string())
+                .unwrap_or_default(),
+            &mut sounds_rows,
+            &mut item_idx,
+        );
+
+        let sounds_height = 2 + sounds_rows.iter().map(|r| r.height()).sum::<u16>();
+        sections.push(Section {
+            title: sounds_label.to_string(),
+            color: sounds_color,
+            height: sounds_height,
+            rows: sounds_rows,
+        });
 
         sections
     }
@@ -392,81 +515,42 @@ impl TuiSettingsRenderer {
         }
     }
 
-    fn build_section(
+    fn add_input_to_rows(
         &self,
         label: &str,
-        children: Vec<SettingsRenderCommand>,
-        _width: u16,
-        color: SectionColor,
-        item_idx: &mut u32,
-    ) -> Section {
-        let mut rows: Vec<SectionRow> = Vec::new();
-
-        for child in children {
-            match child {
-                SettingsRenderCommand::SubSection {
-                    label: sub_label,
-                    children: sub_children,
-                    ..
-                } => {
-                    // Add spacing before subsection header (except for first item)
-                    if !rows.is_empty() {
-                        rows.push(SectionRow::Blank);
-                    }
-                    // Add subsection header with visual indicator
-                    rows.push(SectionRow::SubSectionHeader(sub_label.clone()));
-
-                    // Add all children vertically
-                    for sub_child in sub_children {
-                        self.add_command_to_rows(sub_child, &mut rows, item_idx);
-                    }
-                }
-                _ => {
-                    self.add_command_to_rows(child, &mut rows, item_idx);
-                }
-            }
-        }
-
-        // Calculate height: 2 for borders + sum of row heights
-        let height = 2 + rows.iter().map(|r| r.height()).sum::<u16>();
-
-        Section {
-            title: label.to_string(),
-            color,
-            height,
-            rows,
-        }
-    }
-
-    fn add_command_to_rows(
-        &self,
-        cmd: SettingsRenderCommand,
+        value: &str,
         rows: &mut Vec<SectionRow>,
         item_idx: &mut u32,
     ) {
-        match cmd {
-            SettingsRenderCommand::Input { label, value } => {
-                let idx = *item_idx;
-                *item_idx += 1;
-                let is_selected = self.selected_idx == idx;
-                rows.push(SectionRow::Input {
-                    label,
-                    value,
-                    is_selected,
-                });
-            }
-            SettingsRenderCommand::Checkbox { label, value } => {
-                let idx = *item_idx;
-                *item_idx += 1;
-                let is_selected = self.selected_idx == idx;
-                rows.push(SectionRow::Checkbox {
-                    label,
-                    value,
-                    is_selected,
-                });
-            }
-            _ => {}
-        }
+        let idx = *item_idx;
+        *item_idx += 1;
+        let is_selected = self.selected_idx == idx;
+        rows.push(SectionRow::Input {
+            label: label.to_string(),
+            value: if is_selected && self.editing {
+                format!("{}█", self.edit_buffer)
+            } else {
+                value.to_string()
+            },
+            is_selected,
+        });
+    }
+
+    fn add_checkbox_to_rows(
+        &self,
+        label: &str,
+        value: bool,
+        rows: &mut Vec<SectionRow>,
+        item_idx: &mut u32,
+    ) {
+        let idx = *item_idx;
+        *item_idx += 1;
+        let is_selected = self.selected_idx == idx;
+        rows.push(SectionRow::Checkbox {
+            label: label.to_string(),
+            value,
+            is_selected,
+        });
     }
 
     fn render_section(&self, scroll_view: &mut ScrollView, area: Rect, section: &Section) {
@@ -619,12 +703,17 @@ impl TuiRenderer {
         }
     }
 
-    pub fn flush(&mut self, frame: &mut Frame, commands: Vec<RenderCommand>) {
-        for cmd in commands {
-            match cmd {
-                RenderCommand::Timer(cmds) => self.timer.render(frame, cmds),
-                RenderCommand::Settings(cmds) => self.settings.render(frame, cmds),
-            }
+    pub fn flush(
+        &mut self,
+        frame: &mut Frame,
+        router: &Router,
+        pomodoro: &Pomodoro,
+        config: &Config,
+    ) {
+        match router.active_page() {
+            Some(Page::Timer) => self.timer.render(frame, pomodoro),
+            Some(Page::Settings) => self.settings.render(frame, config),
+            None => {}
         }
     }
 }
