@@ -51,7 +51,7 @@ async function getOptions() {
       if (!isPublicCommit(commit)) return null;
 
       const markerRegex = /\s*\[pub(lic)?\]/gi;
-      const skipCiRegex = /\s*\[skip ci\]/gi;
+      const skipCiRegex = /\s*\[(skip ci|ci skip|no ci|skip actions|actions skip)\]/gi;
 
       if (commit.header) commit.header = commit.header.replace(markerRegex, "").replace(skipCiRegex, "").trim();
       if (commit.subject) commit.subject = commit.subject.replace(markerRegex, "").replace(skipCiRegex, "").trim();
