@@ -6,23 +6,23 @@ use rodio::DeviceSinkBuilder;
 use rodio::Player;
 use tracing::info;
 
-use crate::config::Notification;
-use crate::config::PomodoroNotificationConfig;
+use crate::config::Alarm;
+use crate::config::PomodoroAlarmConfig;
 use crate::models::pomodoro::PomodoroState;
 use crate::services::SoundError;
 use crate::services::SoundService;
 
-pub struct PomodoroNotificationService {
-    focus: Notification,
-    long: Notification,
-    short: Notification,
+pub struct AlarmService {
+    focus: Alarm,
+    long: Alarm,
+    short: Alarm,
     state: Option<PomodoroState>,
 
     sound_thread: Option<JoinHandle<()>>,
 }
 
-impl PomodoroNotificationService {
-    pub fn new(conf: &PomodoroNotificationConfig) -> Self {
+impl AlarmService {
+    pub fn new(conf: &PomodoroAlarmConfig) -> Self {
         Self {
             focus: conf.focus.clone(),
             long: conf.long.clone(),
@@ -36,14 +36,14 @@ impl PomodoroNotificationService {
         self.state = Some(state);
     }
 
-    pub fn set_sounds(&mut self, conf: &PomodoroNotificationConfig) {
+    pub fn set_sounds(&mut self, conf: &PomodoroAlarmConfig) {
         self.focus = conf.focus.clone();
         self.long = conf.long.clone();
         self.short = conf.short.clone();
     }
 }
 
-impl SoundService for PomodoroNotificationService {
+impl SoundService for AlarmService {
     type SoundType = PomodoroState;
 
     fn play(&mut self) -> Result<(), SoundError> {
@@ -52,19 +52,19 @@ impl SoundService for PomodoroNotificationService {
             None => return Err(SoundError::ConfigError("state is empty".to_string())),
         };
 
-        let notif = match state {
+        let alarm = match state {
             PomodoroState::Focus => &self.focus,
             PomodoroState::LongBreak => &self.long,
             PomodoroState::ShortBreak => &self.short,
         };
-        if let Some(path) = &notif.path
+        if let Some(path) = &alarm.path
             && let Ok(file) = File::open(path)
         {
             info!("Playing sound file {}", path.display());
             let decoder = Decoder::try_from(file).unwrap();
             let handle = DeviceSinkBuilder::open_default_sink()?;
             let player = Player::connect_new(handle.mixer());
-            player.set_volume(notif.volume.volume());
+            player.set_volume(alarm.volume.volume());
             player.append(decoder);
 
             self.sound_thread = Some(std::thread::spawn(move || {

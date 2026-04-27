@@ -67,7 +67,7 @@ impl Config {
 pub struct PomodoroConfig {
     pub timer: PomodoroTimerConfig,
     pub hook: PomodoroHookConfig,
-    pub notification: PomodoroNotificationConfig,
+    pub alarm: PomodoroAlarmConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -130,15 +130,15 @@ pub struct PomodoroHookConfig {
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
-pub struct PomodoroNotificationConfig {
-    pub focus: Notification,
-    pub short: Notification,
-    pub long: Notification,
+pub struct PomodoroAlarmConfig {
+    pub focus: Alarm,
+    pub short: Alarm,
+    pub long: Alarm,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
-pub struct Notification {
+pub struct Alarm {
     pub path: Option<PathBuf>,
     pub volume: Percentage,
 }
