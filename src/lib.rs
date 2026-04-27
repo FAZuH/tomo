@@ -4,6 +4,7 @@ pub mod error;
 pub mod log;
 pub mod models;
 pub mod repo;
+pub mod services;
 pub mod ui;
 pub mod utils;
 

@@ -9,6 +9,7 @@ version = "0.1.0"
 
 
 edition = "2024"
+default-run = "tomo"
 
 [lints.clippy]
 new_without_default = "allow"
@@ -20,8 +21,21 @@ crossterm = "0.29.0"
 diesel = { version = "2.3.7", features = ["chrono", "r2d2", "returning_clauses_for_sqlite_3_35", "sqlite"] }
 diesel_migrations = "2.3.1"
 figlet-rs = "1.0.0"
+log = "0.4.29"
 ratatui = "0.30.0"
+rodio = { version = "0.22.2", features = ["tracing"] }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_yml = "0.0.12"
 thiserror = "2.0.18"
+tracing = "0.1.44"
+tracing-appender = "0.2.5"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 tui-widgets = "0.7.2"
+
+[[bin]]
+path = "src/bin/sandbox.rs"
+name = "sandbox"
+
+[[bin]]
+path = "src/main.rs"
+name = "tomo"

@@ -9,6 +9,7 @@ use tui_widgets::scrollview::ScrollViewState;
 use tui_widgets::scrollview::ScrollbarVisibility;
 
 use crate::config::Config;
+use crate::config::Notification;
 use crate::ui::pages::settings::SETTINGS_VIEW_ITEMS;
 
 pub struct TuiSettingsRenderer {
@@ -93,7 +94,7 @@ impl TuiSettingsRenderer {
         let content_width = area.width.saturating_sub(4).max(46);
 
         // Build sections with proper layout
-        let sections = self.build_sections(config, content_width);
+        let sections = self.build_sections(config);
 
         // Calculate total height: title (4) + spacing (1) + sections + padding (2)
         let sections_height: u16 = sections.iter().map(|s| s.height).sum();
@@ -150,10 +151,23 @@ impl TuiSettingsRenderer {
     }
 
     /// Build sections from config, calculating layout and identifying editable items
-    fn build_sections(&self, config: &Config, _width: u16) -> Vec<Section> {
+    fn build_sections(&self, config: &Config) -> Vec<Section> {
         let mut sections = Vec::new();
         let mut item_idx = 0u32;
 
+        self.build_timer_section(config, &mut sections, &mut item_idx);
+        self.build_hooks_section(config, &mut sections, &mut item_idx);
+        self.build_notifs_section(config, &mut sections, &mut item_idx);
+
+        sections
+    }
+
+    fn build_timer_section(
+        &self,
+        config: &Config,
+        sections: &mut Vec<Section>,
+        item_idx: &mut u32,
+    ) {
         // Build Pomodoro Timer section
         let timer_label = "󰔛 Pomodoro Timer";
         let timer_color = Self::section_color_from_label(timer_label);
@@ -166,28 +180,28 @@ impl TuiSettingsRenderer {
         timer_rows.push(SectionRow::SubSectionHeader("Durations".to_string()));
         self.add_input_to_rows(
             "Focus",
-            &format!("{}", config.pomodoro.timer.focus.as_secs() / 60),
+            format!("{}", config.pomodoro.timer.focus.as_secs() / 60),
             &mut timer_rows,
-            &mut item_idx,
+            item_idx,
         );
         self.add_input_to_rows(
             "Short Break",
-            &format!("{}", config.pomodoro.timer.short.as_secs() / 60),
+            format!("{}", config.pomodoro.timer.short.as_secs() / 60),
             &mut timer_rows,
-            &mut item_idx,
+            item_idx,
         );
         self.add_input_to_rows(
             "Long Break",
-            &format!("{}", config.pomodoro.timer.long.as_secs() / 60),
+            format!("{}", config.pomodoro.timer.long.as_secs() / 60),
             &mut timer_rows,
-            &mut item_idx,
+            item_idx,
         );
 
         self.add_input_to_rows(
             "Long Break Interval",
-            &format!("{}", config.pomodoro.timer.long_interval),
+            format!("{}", config.pomodoro.timer.long_interval),
             &mut timer_rows,
-            &mut item_idx,
+            item_idx,
         );
 
         // Auto Start subsection
@@ -199,19 +213,19 @@ impl TuiSettingsRenderer {
             "Focus",
             config.pomodoro.timer.auto_focus,
             &mut timer_rows,
-            &mut item_idx,
+            item_idx,
         );
         self.add_checkbox_to_rows(
             "Short Break",
             config.pomodoro.timer.auto_short,
             &mut timer_rows,
-            &mut item_idx,
+            item_idx,
         );
         self.add_checkbox_to_rows(
             "Long Break",
             config.pomodoro.timer.auto_long,
             &mut timer_rows,
-            &mut item_idx,
+            item_idx,
         );
 
         let timer_height = 2 + timer_rows.iter().map(|r| r.height()).sum::<u16>();
@@ -221,7 +235,14 @@ impl TuiSettingsRenderer {
             height: timer_height,
             rows: timer_rows,
         });
+    }
 
+    fn build_hooks_section(
+        &self,
+        config: &Config,
+        sections: &mut Vec<Section>,
+        item_idx: &mut u32,
+    ) {
         // Build Command Hooks section
         let hooks_label = "󰛢 Command Hooks";
         let hooks_color = Self::section_color_from_label(hooks_label);
@@ -236,19 +257,19 @@ impl TuiSettingsRenderer {
             "Focus",
             &config.pomodoro.hook.focus,
             &mut hooks_rows,
-            &mut item_idx,
+            item_idx,
         );
         self.add_input_to_rows(
             "Short Break",
             &config.pomodoro.hook.short,
             &mut hooks_rows,
-            &mut item_idx,
+            item_idx,
         );
         self.add_input_to_rows(
             "Long Break",
             &config.pomodoro.hook.long,
             &mut hooks_rows,
-            &mut item_idx,
+            item_idx,
         );
 
         let hooks_height = 2 + hooks_rows.iter().map(|r| r.height()).sum::<u16>();
@@ -258,63 +279,83 @@ impl TuiSettingsRenderer {
             height: hooks_height,
             rows: hooks_rows,
         });
+    }
 
-        // Build Sounds section
-        let sounds_label = "󰕾 Sounds";
-        let sounds_color = Self::section_color_from_label(sounds_label);
-        let mut sounds_rows = Vec::new();
+    fn build_notifs_section(
+        &self,
+        config: &Config,
+        sections: &mut Vec<Section>,
+        item_idx: &mut u32,
+    ) {
+        let notif = &config.pomodoro.notification;
+        let mut rows = Vec::new();
 
-        // Sound Files subsection
-        if !sounds_rows.is_empty() {
-            sounds_rows.push(SectionRow::Blank);
-        }
-        sounds_rows.push(SectionRow::SubSectionHeader("Sound Files".to_string()));
+        // Notification Files subsection
+        rows.push(SectionRow::SubSectionHeader(
+            "Notification Files".to_string(),
+        ));
         self.add_input_to_rows(
             "Focus",
-            &config
-                .pomodoro
-                .sound
-                .focus
-                .as_ref()
-                .map(|p| p.display().to_string())
-                .unwrap_or_default(),
-            &mut sounds_rows,
-            &mut item_idx,
+            Self::get_notif_path_value(&notif.focus),
+            &mut rows,
+            item_idx,
         );
         self.add_input_to_rows(
             "Short Break",
-            &config
-                .pomodoro
-                .sound
-                .short
-                .as_ref()
-                .map(|p| p.display().to_string())
-                .unwrap_or_default(),
-            &mut sounds_rows,
-            &mut item_idx,
+            Self::get_notif_path_value(&notif.short),
+            &mut rows,
+            item_idx,
         );
         self.add_input_to_rows(
             "Long Break",
-            &config
-                .pomodoro
-                .sound
-                .long
-                .as_ref()
-                .map(|p| p.display().to_string())
-                .unwrap_or_default(),
-            &mut sounds_rows,
-            &mut item_idx,
+            Self::get_notif_path_value(&notif.long),
+            &mut rows,
+            item_idx,
         );
 
-        let sounds_height = 2 + sounds_rows.iter().map(|r| r.height()).sum::<u16>();
-        sections.push(Section {
-            title: sounds_label.to_string(),
-            color: sounds_color,
-            height: sounds_height,
-            rows: sounds_rows,
-        });
+        // Notification Volumes subsection
+        rows.push(SectionRow::Blank);
+        rows.push(SectionRow::SubSectionHeader(
+            "Notification Volumes".to_string(),
+        ));
+        self.add_input_to_rows(
+            "Focus",
+            Self::get_notif_volume_value(&notif.focus),
+            &mut rows,
+            item_idx,
+        );
+        self.add_input_to_rows(
+            "Short Break",
+            Self::get_notif_volume_value(&notif.short),
+            &mut rows,
+            item_idx,
+        );
+        self.add_input_to_rows(
+            "Long Break",
+            Self::get_notif_volume_value(&notif.long),
+            &mut rows,
+            item_idx,
+        );
 
-        sections
+        let height = 2 + rows.iter().map(|r| r.height()).sum::<u16>();
+        sections.push(Section {
+            title: "󰕾 Notifications".to_string(),
+            color: SectionColor::Notifications,
+            height,
+            rows,
+        });
+    }
+
+    fn get_notif_path_value(notif: &Notification) -> String {
+        notif
+            .path
+            .as_ref()
+            .map(|p| p.display().to_string())
+            .unwrap_or_default()
+    }
+
+    fn get_notif_volume_value(notif: &Notification) -> String {
+        notif.volume.to_string()
     }
 
     fn section_color_from_label(label: &str) -> SectionColor {
@@ -322,8 +363,8 @@ impl TuiSettingsRenderer {
             SectionColor::Timer
         } else if label.contains("Hook") {
             SectionColor::Hooks
-        } else if label.contains("Sound") {
-            SectionColor::Sounds
+        } else if label.contains("Notification") {
+            SectionColor::Notifications
         } else {
             SectionColor::Timer
         }
@@ -331,8 +372,8 @@ impl TuiSettingsRenderer {
 
     fn add_input_to_rows(
         &self,
-        label: &str,
-        value: &str,
+        label: impl ToString,
+        value: impl ToString,
         rows: &mut Vec<SectionRow>,
         item_idx: &mut u32,
     ) {
@@ -509,7 +550,7 @@ impl SectionRow {
 enum SectionColor {
     Timer,
     Hooks,
-    Sounds,
+    Notifications,
 }
 
 impl SectionColor {
@@ -517,7 +558,7 @@ impl SectionColor {
         match self {
             SectionColor::Timer => Color::Cyan,
             SectionColor::Hooks => Color::Yellow,
-            SectionColor::Sounds => Color::Magenta,
+            SectionColor::Notifications => Color::Magenta,
         }
     }
 

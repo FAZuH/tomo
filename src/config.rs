@@ -6,15 +6,27 @@ use serde::Deserialize;
 use serde::Deserializer;
 use serde::Serialize;
 use serde::Serializer;
+use tracing::debug;
+use tracing::info;
 
-use crate::debug;
-use crate::info;
 use crate::utils;
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
 pub struct Config {
     pub pomodoro: PomodoroConfig,
+    pub logs_path: PathBuf,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        let conf_dir = utils::conf_dir();
+        let logs_path = conf_dir.join("logs");
+        Self {
+            pomodoro: Default::default(),
+            logs_path,
+        }
+    }
 }
 
 impl Config {
@@ -50,15 +62,15 @@ impl Config {
     }
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
 pub struct PomodoroConfig {
     pub timer: PomodoroTimerConfig,
     pub hook: PomodoroHookConfig,
-    pub sound: PomodoroSoundConfig,
+    pub notification: PomodoroNotificationConfig,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
 pub struct PomodoroTimerConfig {
     #[serde(with = "duration_as_secs")]
@@ -108,7 +120,7 @@ impl Default for PomodoroTimerConfig {
     }
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
 pub struct PomodoroHookConfig {
     pub focus: String,
@@ -116,12 +128,74 @@ pub struct PomodoroHookConfig {
     pub long: String,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
-pub struct PomodoroSoundConfig {
-    pub focus: Option<PathBuf>,
-    pub short: Option<PathBuf>,
-    pub long: Option<PathBuf>,
+pub struct PomodoroNotificationConfig {
+    pub focus: Notification,
+    pub short: Notification,
+    pub long: Notification,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
+pub struct Notification {
+    pub path: Option<PathBuf>,
+    pub volume: Percentage,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, PartialOrd)]
+pub struct Percentage(f32);
+
+impl Percentage {
+    pub fn new(perc: f32) -> Self {
+        let mut _self = Self::muted();
+        _self.set_clamp(perc);
+        _self
+    }
+
+    pub fn set(&mut self, perc: f32) {
+        self.0 = perc
+    }
+
+    pub fn set_clamp(&mut self, perc: f32) {
+        self.0 = perc.clamp(0.0, 1.0)
+    }
+
+    pub fn muted() -> Self {
+        Self(0.0)
+    }
+
+    pub fn half() -> Self {
+        Self(0.0)
+    }
+
+    pub fn full() -> Self {
+        Self(1.0)
+    }
+
+    pub fn volume(&self) -> f32 {
+        self.0
+    }
+}
+
+impl Default for Percentage {
+    fn default() -> Self {
+        Self::half()
+    }
+}
+
+impl TryFrom<&str> for Percentage {
+    type Error = std::num::ParseIntError;
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        let f: i32 = value.to_string().parse()?;
+        Ok(Percentage::new(f as f32 / 100.0))
+    }
+}
+
+impl std::fmt::Display for Percentage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:.0}%", self.0 * 100.0)
+    }
 }
 
 #[derive(Debug, thiserror::Error)]

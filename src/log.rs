@@ -1,110 +1,47 @@
-use std::sync::OnceLock;
-use std::time::SystemTime;
-use std::time::UNIX_EPOCH;
+//! Logging setup and configuration.
 
-static LOG_LEVEL: OnceLock<u8> = OnceLock::new();
+use std::path::Path;
 
-pub const RESET: &str = "\x1b[0m";
-pub const BOLD: &str = "\x1b[1m";
-pub const DIM: &str = "\x1b[2m";
+use tracing_appender::rolling::RollingFileAppender;
+use tracing_appender::rolling::Rotation;
+use tracing_subscriber::EnvFilter;
+use tracing_subscriber::fmt;
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
 
-pub const RED: &str = "\x1b[31m";
-pub const YELLOW: &str = "\x1b[33m";
-pub const CYAN: &str = "\x1b[36m";
-pub const WHITE: &str = "\x1b[37m";
+use crate::APP_NAME;
+use crate::error::AppError;
 
-pub const BG_RED: &str = "\x1b[41m";
+/// Sets up logging with both console and file output.
+pub fn setup_logging(logs_dir: &Path) -> Result<(), AppError> {
+    if !logs_dir.exists() {
+        std::fs::create_dir_all(logs_dir)
+            .map_err(|e| AppError::ConfigError(format!("Failed creating {logs_dir:?}: {e}")))?;
+    }
+    let writer = RollingFileAppender::builder()
+        .rotation(Rotation::DAILY)
+        .filename_prefix(APP_NAME)
+        .filename_suffix("log")
+        .max_log_files(7)
+        .build(logs_dir)
+        .map_err(|e| {
+            AppError::ConfigError(format!(
+                "Failed to initialize rolling file appender at '{logs_dir:?}': {e}"
+            ))
+        })?;
 
-#[macro_export]
-macro_rules! error {
-    ($($arg:tt)*) => {
-        if $crate::log::log_level() >= 1 {
-            eprintln!(
-                "{dim}{ts}{reset}  {bg}{bold} ERROR {reset}  {red}{msg}{reset}",
-                dim   = $crate::log::DIM,
-                ts    = $crate::log::timestamp(),
-                reset = $crate::log::RESET,
-                bg    = concat!($crate::log::BG_RED, $crate::log::WHITE, $crate::log::BOLD),
-                bold  = $crate::log::BOLD,
-                red   = $crate::log::RED,
-                msg   = format_args!($($arg)*),
-            );
-        }
-    };
-}
+    let (non_blocking, guard) = tracing_appender::non_blocking(writer);
 
-#[macro_export]
-macro_rules! warn {
-    ($($arg:tt)*) => {
-        if $crate::log::log_level() >= 2 {
-            eprintln!(
-                "{dim}{ts}{reset}  {bold}{yellow} WARN {reset}  {yellow}{msg}{reset}",
-                dim    = $crate::log::DIM,
-                ts     = $crate::log::timestamp(),
-                reset  = $crate::log::RESET,
-                bold   = $crate::log::BOLD,
-                yellow = $crate::log::YELLOW,
-                msg    = format_args!($($arg)*),
-            );
-        }
-    };
-}
+    // Leak the guard to prevent it from being dropped
+    std::mem::forget(guard);
 
-#[macro_export]
-macro_rules! info {
-    ($($arg:tt)*) => {
-        if $crate::log::log_level() >= 3 {
-            eprintln!(
-                "{dim}{ts}{reset}  {bold}{cyan} INFO {reset}  {msg}",
-                dim   = $crate::log::DIM,
-                ts    = $crate::log::timestamp(),
-                reset = $crate::log::RESET,
-                bold  = $crate::log::BOLD,
-                cyan  = $crate::log::CYAN,
-                msg   = format_args!($($arg)*),
-            );
-        }
-    };
-}
+    let env_filter = EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| EnvFilter::new(format!("{}_LOG=info", APP_NAME.to_uppercase())));
 
-#[macro_export]
-macro_rules! debug {
-    ($($arg:tt)*) => {
-        if $crate::log::log_level() >= 4 {
-            eprintln!(
-                "{dim}{ts}{reset}  {dim}DEBUG{reset}  {dim}{msg}{reset}",
-                dim   = $crate::log::DIM,
-                ts    = $crate::log::timestamp(),
-                reset = $crate::log::RESET,
-                msg   = format_args!($($arg)*),
-            );
-        }
-    };
-}
+    tracing_subscriber::registry()
+        .with(env_filter)
+        .with(fmt::layer().with_writer(non_blocking).with_ansi(false))
+        .init();
 
-pub fn log_level() -> u8 {
-    *LOG_LEVEL.get_or_init(|| {
-        match std::env::var("TOMO_LOG")
-            .map(|v| v.to_ascii_lowercase())
-            .as_deref()
-        {
-            Ok("error") => 1,
-            Ok("warn") => 2,
-            Ok("info") => 3,
-            Ok("debug") => 4,
-            _ => 0,
-        }
-    })
-}
-
-pub fn timestamp() -> String {
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default();
-    let secs = now.as_secs();
-    let h = (secs % 86400) / 3600;
-    let m = (secs % 3600) / 60;
-    let s = secs % 60;
-    let ms = now.subsec_millis();
-    format!("{:02}:{:02}:{:02}.{:03}", h, m, s, ms)
+    Ok(())
 }

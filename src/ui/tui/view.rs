@@ -12,8 +12,10 @@ use crossterm::terminal::enable_raw_mode;
 use ratatui::prelude::*;
 
 use crate::config::Config;
+use crate::config::Percentage;
 use crate::models::Pomodoro;
 use crate::models::pomodoro::PomodoroState;
+use crate::services::SoundService;
 use crate::ui::Update;
 use crate::ui::pages::settings::SettingsCmd;
 use crate::ui::pages::settings::SettingsMsg;
@@ -28,6 +30,8 @@ use crate::ui::tui::TuiError;
 use crate::ui::tui::input::Input;
 use crate::ui::tui::renderer::TuiRenderer;
 
+type Sound = Box<dyn SoundService<SoundType = PomodoroState>>;
+
 pub struct TuiView {
     router: Router,
     pomodoro: Pomodoro,
@@ -37,10 +41,11 @@ pub struct TuiView {
     renderer: TuiRenderer,
     terminal: Terminal<CrosstermBackend<std::io::Stdout>>,
     needs_redraw: bool,
+    sound: Sound,
 }
 
 impl TuiView {
-    pub fn new(config: Config, pomodoro: Pomodoro) -> Result<Self, TuiError> {
+    pub fn new(config: Config, pomodoro: Pomodoro, sound: Sound) -> Result<Self, TuiError> {
         let renderer = TuiRenderer::new();
         let terminal = Terminal::new(CrosstermBackend::new(std::io::stdout()))?;
 
@@ -53,6 +58,7 @@ impl TuiView {
             renderer,
             terminal,
             needs_redraw: true,
+            sound,
         })
     }
 
@@ -75,7 +81,7 @@ impl TuiView {
 
     fn run_loop(&mut self) -> Result<(), TuiError> {
         let mut last_tick = Instant::now();
-        let tick_rate = Duration::from_secs(1);
+        let tick_rate = Duration::from_millis(1000);
 
         while !self.should_quit {
             let now = Instant::now();
@@ -109,6 +115,7 @@ impl TuiView {
     }
 
     fn tick(&mut self) -> Result<(), TuiError> {
+        self.sound.set_sound(self.pomodoro.state());
         self.render_terminal()?;
         let (model, cmd) = TimerUpdate::update(
             TimerMsg::Tick {
@@ -117,13 +124,35 @@ impl TuiView {
             self.pomodoro.clone(),
         );
         self.pomodoro = model;
+
+        self.handle_timer_cmd(cmd);
+        Ok(())
+    }
+
+    fn handle_timer_cmd(&mut self, cmd: TimerCmd) {
         match cmd {
             TimerCmd::None => {}
             TimerCmd::PromptNextSession => {
                 self.renderer.timer.set_prompt_next_session(true);
+                self.play_sound();
             }
+            TimerCmd::NextSession => {
+                self.next_session();
+                self.play_sound();
+            }
+            TimerCmd::ContinuedSession => {}
         }
-        Ok(())
+    }
+
+    fn play_sound(&mut self) {
+        // TODO: Handle errs
+        if !self.sound.is_playing() {
+            self.sound.play().unwrap();
+        }
+    }
+
+    fn next_session(&mut self) {
+        (self.pomodoro, _) = TimerUpdate::update(TimerMsg::NextState, self.pomodoro.clone());
     }
 
     fn should_auto_next(&self) -> bool {
@@ -199,8 +228,7 @@ impl TuiView {
 
         match input {
             Enter | Char('y') => {
-                (self.pomodoro, _) =
-                    TimerUpdate::update(TimerMsg::NextState, self.pomodoro.clone());
+                self.next_session();
                 self.renderer.timer.set_prompt_next_session(false);
             }
             Esc | Char('n') => self.quit(),
@@ -266,23 +294,28 @@ impl TuiView {
         let value = settings.edit_buffer().to_string();
         settings.cancel_editing();
 
+        use SettingsMsg::*;
         let msg = match selected_idx {
             // Timer settings (0-6)
-            0 => Some(SettingsMsg::TimerFocus(parse_duration_minutes(&value))),
-            1 => Some(SettingsMsg::TimerShort(parse_duration_minutes(&value))),
-            2 => Some(SettingsMsg::TimerLong(parse_duration_minutes(&value))),
-            3 => Some(SettingsMsg::TimerLongInterval(value.parse().unwrap_or(4))),
-            4 => Some(SettingsMsg::TimerAutoFocus),
-            5 => Some(SettingsMsg::TimerAutoShort),
-            6 => Some(SettingsMsg::TimerAutoLong),
+            0 => Some(TimerFocus(parse_duration_minutes(&value))),
+            1 => Some(TimerShort(parse_duration_minutes(&value))),
+            2 => Some(TimerLong(parse_duration_minutes(&value))),
+            3 => Some(TimerLongInterval(value.parse().unwrap_or(4))),
+            4 => Some(TimerAutoFocus),
+            5 => Some(TimerAutoShort),
+            6 => Some(TimerAutoLong),
             // Hook settings (7-9)
-            7 => Some(SettingsMsg::HookFocus(value)),
-            8 => Some(SettingsMsg::HookShort(value)),
-            9 => Some(SettingsMsg::HookLong(value)),
-            // Sound settings (10-12)
-            10 => Some(SettingsMsg::SoundFocus(parse_path(&value))),
-            11 => Some(SettingsMsg::SoundShort(parse_path(&value))),
-            12 => Some(SettingsMsg::SoundLong(parse_path(&value))),
+            7 => Some(HookFocus(value)),
+            8 => Some(HookShort(value)),
+            9 => Some(HookLong(value)),
+            // Notification path settings (10-12)
+            10 => Some(NotificationPathFocus(parse_path(&value))),
+            11 => Some(NotificationPathShort(parse_path(&value))),
+            12 => Some(NotificationPathLong(parse_path(&value))),
+            // Notification volume settings (10-12)
+            13 => Some(NotificationVolumeFocus(parse_volume(&value))),
+            14 => Some(NotificationVolumeShort(parse_volume(&value))),
+            15 => Some(NotificationVolumeLong(parse_volume(&value))),
             _ => return,
         };
 
@@ -321,6 +354,7 @@ impl TuiView {
     }
 }
 
+// TODO: show error instead of default
 fn parse_duration_minutes(s: &str) -> Duration {
     s.parse::<u64>()
         .map(|m| Duration::from_secs(m * 60))
@@ -332,5 +366,13 @@ fn parse_path(s: &str) -> Option<std::path::PathBuf> {
         None
     } else {
         Some(std::path::PathBuf::from(s))
+    }
+}
+
+fn parse_volume(s: &str) -> Percentage {
+    if s.is_empty() {
+        Percentage::default()
+    } else {
+        Percentage::try_from(s).unwrap_or_default()
     }
 }
