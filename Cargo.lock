@@ -3154,6 +3154,7 @@ dependencies = [
  "rodio",
  "serde",
  "serde_yml",
+ "shlex",
  "thiserror 2.0.18",
  "tracing",
  "tracing-appender",
