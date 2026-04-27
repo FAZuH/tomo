@@ -1,3 +1,4 @@
+pub mod notify;
 pub mod sound;
 pub mod traits;
 

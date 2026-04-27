@@ -16,6 +16,7 @@ use crate::config::Percentage;
 use crate::models::Pomodoro;
 use crate::models::pomodoro::PomodoroState;
 use crate::services::SoundService;
+use crate::services::notify::notify_pomodoro;
 use crate::ui::Update;
 use crate::ui::pages::settings::SettingsCmd;
 use crate::ui::pages::settings::SettingsMsg;
@@ -115,7 +116,6 @@ impl TuiView {
     }
 
     fn tick(&mut self) -> Result<(), TuiError> {
-        self.sound.set_sound(self.pomodoro.state());
         self.render_terminal()?;
         let (model, cmd) = TimerUpdate::update(
             TimerMsg::Tick {
@@ -133,20 +133,31 @@ impl TuiView {
         match cmd {
             TimerCmd::None => {}
             TimerCmd::PromptNextSession => {
+                if !self.renderer.timer.prompt_next_session() {
+                    // only runs on once per session
+                    self.send_notification();
+                    self.play_sound();
+                }
                 self.renderer.timer.set_prompt_next_session(true);
-                self.play_sound();
             }
             TimerCmd::NextSession => {
-                self.next_session();
+                self.send_notification();
                 self.play_sound();
+
+                self.next_session();
             }
             TimerCmd::ContinuedSession => {}
         }
     }
 
+    fn send_notification(&self) {
+        notify_pomodoro(self.pomodoro.next_state());
+    }
+
     fn play_sound(&mut self) {
         // TODO: Handle errs
         if !self.sound.is_playing() {
+            self.sound.set_sound(self.pomodoro.next_state());
             self.sound.play().unwrap();
         }
     }
