@@ -4,7 +4,7 @@ use tomo::config::Config;
 use tomo::error::AppError;
 use tomo::log::setup_logging;
 use tomo::models::Pomodoro;
-use tomo::services::sound::PomodoroNotificationService;
+use tomo::services::sound::AlarmService;
 use tomo::ui::tui::TuiView;
 
 fn main() -> Result<(), AppError> {
@@ -15,9 +15,7 @@ fn main() -> Result<(), AppError> {
     let mut model = create_model(&cli, &conf);
     model.start().unwrap();
 
-    let sound = Box::new(PomodoroNotificationService::new(
-        &conf.pomodoro.notification,
-    ));
+    let sound = Box::new(AlarmService::new(&conf.pomodoro.alarm));
 
     let mut runner = TuiView::new(conf, model, sound).unwrap();
     runner.run().unwrap();

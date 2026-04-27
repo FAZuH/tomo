@@ -8,8 +8,8 @@ use tui_widgets::scrollview::ScrollView;
 use tui_widgets::scrollview::ScrollViewState;
 use tui_widgets::scrollview::ScrollbarVisibility;
 
+use crate::config::Alarm;
 use crate::config::Config;
-use crate::config::Notification;
 use crate::ui::pages::settings::SETTINGS_VIEW_ITEMS;
 
 pub struct TuiSettingsRenderer {
@@ -157,7 +157,7 @@ impl TuiSettingsRenderer {
 
         self.build_timer_section(config, &mut sections, &mut item_idx);
         self.build_hooks_section(config, &mut sections, &mut item_idx);
-        self.build_notifs_section(config, &mut sections, &mut item_idx);
+        self.build_alarm_section(config, &mut sections, &mut item_idx);
 
         sections
     }
@@ -281,81 +281,77 @@ impl TuiSettingsRenderer {
         });
     }
 
-    fn build_notifs_section(
+    fn build_alarm_section(
         &self,
         config: &Config,
         sections: &mut Vec<Section>,
         item_idx: &mut u32,
     ) {
-        let notif = &config.pomodoro.notification;
+        let alarm = &config.pomodoro.alarm;
         let mut rows = Vec::new();
 
-        // Notification Files subsection
-        rows.push(SectionRow::SubSectionHeader(
-            "Notification Files".to_string(),
-        ));
+        // Alarm Files subsection
+        rows.push(SectionRow::SubSectionHeader("Alarm Files".to_string()));
         self.add_input_to_rows(
             "Focus",
-            Self::get_notif_path_value(&notif.focus),
+            Self::get_alarm_path_value(&alarm.focus),
             &mut rows,
             item_idx,
         );
         self.add_input_to_rows(
             "Short Break",
-            Self::get_notif_path_value(&notif.short),
+            Self::get_alarm_path_value(&alarm.short),
             &mut rows,
             item_idx,
         );
         self.add_input_to_rows(
             "Long Break",
-            Self::get_notif_path_value(&notif.long),
+            Self::get_alarm_path_value(&alarm.long),
             &mut rows,
             item_idx,
         );
 
-        // Notification Volumes subsection
+        // Alarm Volumes subsection
         rows.push(SectionRow::Blank);
-        rows.push(SectionRow::SubSectionHeader(
-            "Notification Volumes".to_string(),
-        ));
+        rows.push(SectionRow::SubSectionHeader("Alarm Volumes".to_string()));
         self.add_input_to_rows(
             "Focus",
-            Self::get_notif_volume_value(&notif.focus),
+            Self::get_alarm_volume_value(&alarm.focus),
             &mut rows,
             item_idx,
         );
         self.add_input_to_rows(
             "Short Break",
-            Self::get_notif_volume_value(&notif.short),
+            Self::get_alarm_volume_value(&alarm.short),
             &mut rows,
             item_idx,
         );
         self.add_input_to_rows(
             "Long Break",
-            Self::get_notif_volume_value(&notif.long),
+            Self::get_alarm_volume_value(&alarm.long),
             &mut rows,
             item_idx,
         );
 
         let height = 2 + rows.iter().map(|r| r.height()).sum::<u16>();
         sections.push(Section {
-            title: "󰕾 Notifications".to_string(),
-            color: SectionColor::Notifications,
+            title: "󰕾 Alarm".to_string(),
+            color: SectionColor::Alarm,
             height,
             rows,
         });
     }
 
-    fn get_notif_path_value(notif: &Notification) -> String {
-        notif
+    fn get_alarm_path_value(alarm: &Alarm) -> String {
+        alarm
             .path
             .as_ref()
             .map(|p| p.display().to_string())
             .unwrap_or_default()
     }
 
-    fn get_notif_volume_value(notif: &Notification) -> String {
-        notif.volume.to_string()
+    fn get_alarm_volume_value(alarm: &Alarm) -> String {
+        alarm.volume.to_string()
     }
 
     fn section_color_from_label(label: &str) -> SectionColor {
@@ -363,8 +359,8 @@ impl TuiSettingsRenderer {
             SectionColor::Timer
         } else if label.contains("Hook") {
             SectionColor::Hooks
-        } else if label.contains("Notification") {
-            SectionColor::Notifications
+        } else if label.contains("Alarm") {
+            SectionColor::Alarm
         } else {
             SectionColor::Timer
         }
@@ -550,7 +546,7 @@ impl SectionRow {
 enum SectionColor {
     Timer,
     Hooks,
-    Notifications,
+    Alarm,
 }
 
 impl SectionColor {
@@ -558,7 +554,7 @@ impl SectionColor {
         match self {
             SectionColor::Timer => Color::Cyan,
             SectionColor::Hooks => Color::Yellow,
-            SectionColor::Notifications => Color::Magenta,
+            SectionColor::Alarm => Color::Magenta,
         }
     }
 

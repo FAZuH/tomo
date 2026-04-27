@@ -14,7 +14,7 @@
 - **Session Tracking:** Track completed focus sessions and total sessions
 - **Terminal User Interface:** Clean TUI built with [ratatui](https://github.com/ratatui/ratatui) for an intuitive in-terminal experience
 - **Hooks Support:** Execute custom commands when sessions start (focus, short break, long break)
-- **Sound Notifications:** Optional sound alerts for session transitions
+- **Session Alarms:** Optional alarm sounds for session transitions
 - **Lightweight & Fast:** Written in Rust for optimal performance
 
 <img width="1920" height="1200" alt="image" src="https://github.com/user-attachments/assets/29380a2e-6508-4f85-ad1c-f1d78a226be3" />

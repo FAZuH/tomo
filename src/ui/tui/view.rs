@@ -308,14 +308,14 @@ impl TuiView {
             7 => Some(HookFocus(value)),
             8 => Some(HookShort(value)),
             9 => Some(HookLong(value)),
-            // Notification path settings (10-12)
-            10 => Some(NotificationPathFocus(parse_path(&value))),
-            11 => Some(NotificationPathShort(parse_path(&value))),
-            12 => Some(NotificationPathLong(parse_path(&value))),
-            // Notification volume settings (10-12)
-            13 => Some(NotificationVolumeFocus(parse_volume(&value))),
-            14 => Some(NotificationVolumeShort(parse_volume(&value))),
-            15 => Some(NotificationVolumeLong(parse_volume(&value))),
+            // Alarm path settings (10-12)
+            10 => Some(AlarmPathFocus(parse_path(&value))),
+            11 => Some(AlarmPathShort(parse_path(&value))),
+            12 => Some(AlarmPathLong(parse_path(&value))),
+            // Alarm volume settings (10-12)
+            13 => Some(AlarmVolumeFocus(parse_volume(&value))),
+            14 => Some(AlarmVolumeShort(parse_volume(&value))),
+            15 => Some(AlarmVolumeLong(parse_volume(&value))),
             _ => return,
         };
 

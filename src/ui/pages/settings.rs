@@ -23,14 +23,14 @@ pub enum SettingsMsg {
     HookFocus(String),
     HookShort(String),
     HookLong(String),
-    // Notifications path settings
-    NotificationPathFocus(Option<PathBuf>),
-    NotificationPathShort(Option<PathBuf>),
-    NotificationPathLong(Option<PathBuf>),
-    // Notifications volume settings
-    NotificationVolumeFocus(Percentage),
-    NotificationVolumeShort(Percentage),
-    NotificationVolumeLong(Percentage),
+    // Alarm path settings
+    AlarmPathFocus(Option<PathBuf>),
+    AlarmPathShort(Option<PathBuf>),
+    AlarmPathLong(Option<PathBuf>),
+    // Alarm volume settings
+    AlarmVolumeFocus(Percentage),
+    AlarmVolumeShort(Percentage),
+    AlarmVolumeLong(Percentage),
     // Other
     SaveToDisk,
 }
@@ -64,7 +64,7 @@ impl Update for SettingsUpdate {
         use SettingsMsg::*;
         let timer = &mut model.pomodoro.timer;
         let hook = &mut model.pomodoro.hook;
-        let notif = &mut model.pomodoro.notification;
+        let alarm = &mut model.pomodoro.alarm;
         let mut cmd = SettingsCmd::None;
         match msg {
             // Timer
@@ -79,14 +79,14 @@ impl Update for SettingsUpdate {
             HookFocus(s) => hook.focus = s,
             HookShort(s) => hook.short = s,
             HookLong(s) => hook.long = s,
-            // Notifications
-            NotificationPathFocus(p) => notif.focus.path = p,
-            NotificationPathShort(p) => notif.short.path = p,
-            NotificationPathLong(p) => notif.long.path = p,
+            // Alarm
+            AlarmPathFocus(p) => alarm.focus.path = p,
+            AlarmPathShort(p) => alarm.short.path = p,
+            AlarmPathLong(p) => alarm.long.path = p,
             SaveToDisk => cmd = SettingsCmd::SavedToDisk(model.save()),
-            NotificationVolumeFocus(v) => notif.focus.volume = v,
-            NotificationVolumeShort(v) => notif.short.volume = v,
-            NotificationVolumeLong(v) => notif.long.volume = v,
+            AlarmVolumeFocus(v) => alarm.focus.volume = v,
+            AlarmVolumeShort(v) => alarm.short.volume = v,
+            AlarmVolumeLong(v) => alarm.long.volume = v,
         }
         (model, cmd)
     }
