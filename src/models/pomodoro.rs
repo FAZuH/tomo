@@ -164,17 +164,18 @@ impl Pomodoro {
     /// Go to the next state.
     fn go_next_state(&mut self) {
         self.total_sessions += 1;
-        if self.state() == Focus {
+        let prev_state = self.state();
+        self.state = self.next_state();
+        if prev_state == Focus {
             self.focus_sessions += 1;
         }
-        self.state = self.next_state();
     }
 
     /// Gets the next state after this state.
     pub fn next_state(&self) -> PomodoroState {
         match self.state {
             Focus => {
-                if self.focus_sessions.is_multiple_of(self.long_interval) {
+                if (self.focus_sessions + 1).is_multiple_of(self.long_interval) {
                     LongBreak
                 } else {
                     ShortBreak
@@ -271,6 +272,7 @@ mod tests {
             ..Default::default()
         };
 
+        assert_eq!(pomo.next_state(), Focus);
         pomo.go_next_state();
         assert_eq!(pomo.state(), Focus)
     }
@@ -279,6 +281,7 @@ mod tests {
     fn test_next_state_short_break() {
         let mut pomo = Pomodoro::default();
 
+        assert_eq!(pomo.next_state(), ShortBreak);
         pomo.go_next_state();
         assert_eq!(pomo.state(), ShortBreak)
     }
@@ -297,6 +300,7 @@ mod tests {
         pomo.go_next_state();
 
         // Long Break
+        assert_eq!(pomo.next_state(), LongBreak);
         pomo.go_next_state();
         assert_eq!(pomo.state(), LongBreak)
     }

@@ -9,6 +9,7 @@ use crossterm::terminal::EnterAlternateScreen;
 use crossterm::terminal::LeaveAlternateScreen;
 use crossterm::terminal::disable_raw_mode;
 use crossterm::terminal::enable_raw_mode;
+use log::error;
 use ratatui::prelude::*;
 
 use crate::config::Config;
@@ -16,6 +17,8 @@ use crate::config::Percentage;
 use crate::models::Pomodoro;
 use crate::models::pomodoro::PomodoroState;
 use crate::services::SoundService;
+use crate::services::cmd_runner::run_cmds;
+use crate::services::notify::notify_pomodoro;
 use crate::ui::Update;
 use crate::ui::pages::settings::SettingsCmd;
 use crate::ui::pages::settings::SettingsMsg;
@@ -115,7 +118,6 @@ impl TuiView {
     }
 
     fn tick(&mut self) -> Result<(), TuiError> {
-        self.sound.set_sound(self.pomodoro.state());
         self.render_terminal()?;
         let (model, cmd) = TimerUpdate::update(
             TimerMsg::Tick {
@@ -133,21 +135,41 @@ impl TuiView {
         match cmd {
             TimerCmd::None => {}
             TimerCmd::PromptNextSession => {
+                if !self.renderer.timer.prompt_next_session() {
+                    // only runs on once per session
+                    self.on_session_end();
+                }
                 self.renderer.timer.set_prompt_next_session(true);
-                self.play_sound();
             }
             TimerCmd::NextSession => {
+                self.on_session_end();
                 self.next_session();
-                self.play_sound();
             }
             TimerCmd::ContinuedSession => {}
         }
     }
 
-    fn play_sound(&mut self) {
+    fn on_session_end(&mut self) {
         // TODO: Handle errs
+        self.run_hooks();
+        self.play_sound();
+        self.send_notification();
+    }
+
+    fn run_hooks(&self) {
+        run_cmds(&self.config.pomodoro.hook, self.pomodoro.state())
+    }
+
+    fn send_notification(&self) {
+        notify_pomodoro(self.pomodoro.next_state());
+    }
+
+    fn play_sound(&mut self) {
         if !self.sound.is_playing() {
-            self.sound.play().unwrap();
+            self.sound.set_sound(self.pomodoro.next_state());
+            if let Err(e) = self.sound.play() {
+                error!("{e}")
+            }
         }
     }
 

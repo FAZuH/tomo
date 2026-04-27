@@ -35,8 +35,7 @@ pub fn setup_logging(logs_dir: &Path) -> Result<(), AppError> {
     // Leak the guard to prevent it from being dropped
     std::mem::forget(guard);
 
-    let env_filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new(format!("{}_LOG=info", APP_NAME.to_uppercase())));
+    let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
 
     tracing_subscriber::registry()
         .with(env_filter)

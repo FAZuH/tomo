@@ -112,7 +112,7 @@ impl Default for PomodoroTimerConfig {
             focus: Duration::from_mins(25),
             short: Duration::from_mins(5),
             long: Duration::from_mins(10),
-            long_interval: 3,
+            long_interval: 4,
             auto_focus: false,
             auto_short: false,
             auto_long: false,
