@@ -3,14 +3,17 @@ use std::time::Duration;
 
 use ratatui::layout::Flex;
 use ratatui::prelude::*;
+use ratatui::symbols::border;
 use ratatui::widgets::Gauge;
 use ratatui::widgets::Paragraph;
+use tui_widgets::popup::Popup;
 
 use crate::models::Pomodoro;
 use crate::models::pomodoro::PomodoroState;
 use crate::utils;
 
 pub struct TuiTimerRenderer {
+    prompt_next_session: bool,
     layout: Layout,
     paused_p: Paragraph<'static>,
     paused_width: u16,
@@ -41,6 +44,7 @@ impl TuiTimerRenderer {
         }
 
         Self {
+            prompt_next_session: false,
             layout: Self::layout(),
             paused_p,
             paused_width,
@@ -76,6 +80,53 @@ impl TuiTimerRenderer {
         );
 
         self.shortcuts(frame, rows[8]);
+
+        self.prompt(frame, pomodoro);
+    }
+
+    pub fn set_prompt_next_session(&mut self, val: bool) {
+        self.prompt_next_session = val;
+    }
+
+    pub fn prompt_next_session(&self) -> bool {
+        self.prompt_next_session
+    }
+
+    // Render popup if prompt is active
+    fn prompt(&self, frame: &mut Frame, model: &Pomodoro) {
+        if self.prompt_next_session {
+            let next = model.next_state().to_string().to_lowercase();
+            let body = Text::from(vec![
+                Line::from(""),
+                Line::from(""),
+                Line::from(format!("     start {next} session?     ")).alignment(Alignment::Center),
+                Line::from(""),
+                Line::from(""),
+                Line::from("              ").alignment(Alignment::Center),
+                Line::from(vec![
+                    Span::from("       "),
+                    Span::styled(
+                        "  y/enter: Yes  ",
+                        Style::new().fg(Color::DarkGray).bg(Color::Green),
+                    ),
+                    Span::from("   "),
+                    Span::styled(
+                        "  n/esc: No  ",
+                        Style::new().fg(Color::DarkGray).bg(Color::Red),
+                    ),
+                    Span::from("       "),
+                ])
+                .alignment(Alignment::Center),
+                Line::from(""),
+                Line::from(""),
+            ])
+            .alignment(Alignment::Center);
+            let prompt_popup = Popup::new(body)
+                .border_style(Style::new().fg(Color::Yellow))
+                .border_set(border::ROUNDED);
+
+            frame.render_widget(prompt_popup, frame.area());
+        }
     }
 
     fn state(&self, frame: &mut Frame, area: Rect, state: PomodoroState, paused: bool) {
@@ -168,10 +219,10 @@ impl TuiTimerRenderer {
             Span::styled("Backspace", bright),
             Span::styled(": Reset", dim),
             sep.clone(),
-            Span::styled("←→", bright),
+            Span::styled(" ", bright),
             Span::styled(": ±30s", dim),
             sep.clone(),
-            Span::styled("↑↓", bright),
+            Span::styled("", bright),
             Span::styled(": ±1m", dim),
             sep.clone(),
             Span::styled("q", bright),
