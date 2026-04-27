@@ -13,10 +13,12 @@ use ratatui::prelude::*;
 
 use crate::config::Config;
 use crate::models::Pomodoro;
+use crate::models::pomodoro::PomodoroState;
 use crate::ui::Update;
 use crate::ui::pages::settings::SettingsCmd;
 use crate::ui::pages::settings::SettingsMsg;
 use crate::ui::pages::settings::SettingsUpdate;
+use crate::ui::pages::timer::TimerCmd;
 use crate::ui::pages::timer::TimerMsg;
 use crate::ui::pages::timer::TimerUpdate;
 use crate::ui::router::Navigation;
@@ -72,18 +74,18 @@ impl TuiView {
     }
 
     fn run_loop(&mut self) -> Result<(), TuiError> {
-        let mut last_redraw = Instant::now();
-        let redraw_rate = Duration::from_secs(1);
+        let mut last_tick = Instant::now();
+        let tick_rate = Duration::from_secs(1);
 
         while !self.should_quit {
             let now = Instant::now();
-            if now.duration_since(last_redraw) >= redraw_rate {
-                last_redraw = now;
+            if now.duration_since(last_tick) >= tick_rate {
+                last_tick = now;
                 self.needs_redraw = true;
             }
 
             if self.needs_redraw {
-                self.render_terminal()?;
+                self.tick()?;
                 self.needs_redraw = false;
             }
 
@@ -103,6 +105,33 @@ impl TuiView {
             Ok(Input::from_keyevent(key))
         } else {
             Ok(None)
+        }
+    }
+
+    fn tick(&mut self) -> Result<(), TuiError> {
+        self.render_terminal()?;
+        let (model, cmd) = TimerUpdate::update(
+            TimerMsg::Tick {
+                auto_next: self.should_auto_next(),
+            },
+            self.pomodoro.clone(),
+        );
+        self.pomodoro = model;
+        match cmd {
+            TimerCmd::None => {}
+            TimerCmd::PromptNextSession => {
+                self.renderer.timer.set_prompt_next_session(true);
+            }
+        }
+        Ok(())
+    }
+
+    fn should_auto_next(&self) -> bool {
+        let timer = &self.config.pomodoro.timer;
+        match self.pomodoro.state() {
+            PomodoroState::Focus => timer.auto_focus,
+            PomodoroState::LongBreak => timer.auto_long,
+            PomodoroState::ShortBreak => timer.auto_short,
         }
     }
 
@@ -127,6 +156,10 @@ impl TuiView {
     fn handle_timer(&mut self, input: Input) -> Result<(), TuiError> {
         use Input::*;
         use TimerMsg::*;
+
+        if self.renderer.timer.prompt_next_session() {
+            return self.handle_timer_nextstate_prompt(input);
+        }
 
         match input {
             Left | Char('h') => {
@@ -154,10 +187,26 @@ impl TuiView {
             Backspace => {
                 (self.pomodoro, _) = TimerUpdate::update(ResetSession, self.pomodoro.clone());
             }
-            Char('q') => self.router.navigate(Navigation::Quit),
+            Char('q') => self.quit(),
             Char('s') => self.router.navigate(Navigation::GoTo(Page::Settings)),
             _ => {}
         }
+        Ok(())
+    }
+
+    fn handle_timer_nextstate_prompt(&mut self, input: Input) -> Result<(), TuiError> {
+        use Input::*;
+
+        match input {
+            Enter | Char('y') => {
+                (self.pomodoro, _) =
+                    TimerUpdate::update(TimerMsg::NextState, self.pomodoro.clone());
+                self.renderer.timer.set_prompt_next_session(false);
+            }
+            Esc | Char('n') => self.quit(),
+            _ => {}
+        }
+
         Ok(())
     }
 
@@ -267,6 +316,7 @@ impl TuiView {
     }
 
     fn quit(&mut self) {
+        self.router.navigate(Navigation::Quit);
         self.should_quit = true
     }
 }
