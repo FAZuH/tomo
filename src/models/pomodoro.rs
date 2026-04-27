@@ -108,7 +108,7 @@ impl Pomodoro {
 
     /// Skips to the next session.
     pub fn skip(&mut self) {
-        self.next_state();
+        self.go_next_state();
         self.reset_time();
     }
 
@@ -161,6 +161,29 @@ impl Pomodoro {
         }
     }
 
+    /// Go to the next state.
+    fn go_next_state(&mut self) {
+        self.total_sessions += 1;
+        if self.state() == Focus {
+            self.focus_sessions += 1;
+        }
+        self.state = self.next_state();
+    }
+
+    /// Gets the next state after this state.
+    pub fn next_state(&self) -> PomodoroState {
+        match self.state {
+            Focus => {
+                if self.focus_sessions.is_multiple_of(self.long_interval) {
+                    LongBreak
+                } else {
+                    ShortBreak
+                }
+            }
+            _ => Focus,
+        }
+    }
+
     fn reset_time(&mut self) {
         if let Some(anchor) = self.anchor {
             self.accumulated += anchor.elapsed();
@@ -188,22 +211,6 @@ impl Pomodoro {
         }
         Ok(())
     }
-
-    /// Sets session state based on previous state.
-    fn next_state(&mut self) {
-        self.total_sessions += 1;
-        match self.state {
-            Focus => {
-                self.focus_sessions += 1;
-                if self.focus_sessions.is_multiple_of(self.long_interval) {
-                    self.state = LongBreak;
-                } else {
-                    self.state = ShortBreak;
-                }
-            }
-            _ => self.state = Focus,
-        }
-    }
 }
 
 impl Default for Pomodoro {
@@ -224,11 +231,21 @@ impl Default for Pomodoro {
     }
 }
 
-#[derive(Clone, Debug, Copy, PartialEq, Eq)]
+#[derive(Clone, Debug, Copy, PartialEq, Eq, Hash)]
 pub enum PomodoroState {
     Focus,
     LongBreak,
     ShortBreak,
+}
+
+impl std::fmt::Display for PomodoroState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Focus => write!(f, "Focus"),
+            LongBreak => write!(f, "Long Break"),
+            ShortBreak => write!(f, "Short Break"),
+        }
+    }
 }
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
@@ -254,7 +271,7 @@ mod tests {
             ..Default::default()
         };
 
-        pomo.next_state();
+        pomo.go_next_state();
         assert_eq!(pomo.state(), Focus)
     }
 
@@ -262,7 +279,7 @@ mod tests {
     fn test_next_state_short_break() {
         let mut pomo = Pomodoro::default();
 
-        pomo.next_state();
+        pomo.go_next_state();
         assert_eq!(pomo.state(), ShortBreak)
     }
 
@@ -271,16 +288,16 @@ mod tests {
         let mut pomo = Pomodoro::default();
 
         // Short break
-        pomo.next_state();
+        pomo.go_next_state();
         // Focus
-        pomo.next_state();
+        pomo.go_next_state();
         // Short break
-        pomo.next_state();
+        pomo.go_next_state();
         // Focus
-        pomo.next_state();
+        pomo.go_next_state();
 
         // Long Break
-        pomo.next_state();
+        pomo.go_next_state();
         assert_eq!(pomo.state(), LongBreak)
     }
 

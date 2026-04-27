@@ -3,12 +3,12 @@ use crate::config::ConfigError;
 use crate::ui::UiError;
 
 #[derive(Debug, thiserror::Error)]
-pub enum Error {
+pub enum AppError {
     #[error(transparent)]
     Cli(#[from] CliArgumentError),
 
-    #[error(transparent)]
-    Config(#[from] ConfigError),
+    #[error("Configuration error: {0}")]
+    ConfigError(String),
 
     #[error(transparent)]
     Ui(#[from] UiError),
@@ -17,4 +17,10 @@ pub enum Error {
     InvalidState(String),
 }
 
-pub type Result<T> = std::result::Result<T, Error>;
+impl From<ConfigError> for AppError {
+    fn from(value: ConfigError) -> Self {
+        Self::ConfigError(value.to_string())
+    }
+}
+
+pub type Result<T> = std::result::Result<T, AppError>;

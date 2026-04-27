@@ -1,24 +1,54 @@
+use std::collections::HashMap;
 use std::time::Duration;
 
 use ratatui::layout::Flex;
 use ratatui::prelude::*;
+use ratatui::symbols::border;
 use ratatui::widgets::Gauge;
 use ratatui::widgets::Paragraph;
+use tui_widgets::popup::Popup;
 
 use crate::models::Pomodoro;
 use crate::models::pomodoro::PomodoroState;
 use crate::utils;
 
 pub struct TuiTimerRenderer {
+    prompt_next_session: bool,
     layout: Layout,
     paused_p: Paragraph<'static>,
+    paused_width: u16,
+    state_labels: HashMap<PomodoroState, (String, u16)>,
 }
 
 impl TuiTimerRenderer {
     pub fn new() -> Self {
+        // Pre-compute paused text
+        let paused_text = utils::ascii_future(" ( PAUSED )");
+        let paused_width = utils::string_width(&paused_text) as u16;
+        let paused_p = Paragraph::new(paused_text).style(
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        );
+
+        // Pre-compute state labels
+        let mut state_labels = HashMap::new();
+        for (state, text) in [
+            (PomodoroState::Focus, "FOCUS"),
+            (PomodoroState::ShortBreak, "SHORT BREAK"),
+            (PomodoroState::LongBreak, "LONG BREAK"),
+        ] {
+            let label = utils::ascii_future(text);
+            let width = utils::string_width(&label) as u16;
+            state_labels.insert(state, (label, width));
+        }
+
         Self {
+            prompt_next_session: false,
             layout: Self::layout(),
-            paused_p: Self::paused_paragraph(),
+            paused_p,
+            paused_width,
+            state_labels,
         }
     }
 
@@ -50,34 +80,80 @@ impl TuiTimerRenderer {
         );
 
         self.shortcuts(frame, rows[8]);
+
+        self.prompt(frame, pomodoro);
+    }
+
+    pub fn set_prompt_next_session(&mut self, val: bool) {
+        self.prompt_next_session = val;
+    }
+
+    pub fn prompt_next_session(&self) -> bool {
+        self.prompt_next_session
+    }
+
+    // Render popup if prompt is active
+    fn prompt(&self, frame: &mut Frame, model: &Pomodoro) {
+        if self.prompt_next_session {
+            let next = model.next_state().to_string().to_lowercase();
+            let body = Text::from(vec![
+                Line::from(""),
+                Line::from(""),
+                Line::from(format!("     start {next} session?     ")).alignment(Alignment::Center),
+                Line::from(""),
+                Line::from(""),
+                Line::from("              ").alignment(Alignment::Center),
+                Line::from(vec![
+                    Span::from("       "),
+                    Span::styled(
+                        "  y/enter: Yes  ",
+                        Style::new().fg(Color::DarkGray).bg(Color::Green),
+                    ),
+                    Span::from("   "),
+                    Span::styled(
+                        "  n/esc: No  ",
+                        Style::new().fg(Color::DarkGray).bg(Color::Red),
+                    ),
+                    Span::from("       "),
+                ])
+                .alignment(Alignment::Center),
+                Line::from(""),
+                Line::from(""),
+            ])
+            .alignment(Alignment::Center);
+            let prompt_popup = Popup::new(body)
+                .border_style(Style::new().fg(Color::Yellow))
+                .border_set(border::ROUNDED);
+
+            frame.render_widget(prompt_popup, frame.area());
+        }
     }
 
     fn state(&self, frame: &mut Frame, area: Rect, state: PomodoroState, paused: bool) {
-        // TODO: Pre-compute this and store ascii instead
-        let (label, color) = match state {
-            PomodoroState::Focus => ("FOCUS", Color::LightRed),
-            PomodoroState::ShortBreak => ("SHORT BREAK", Color::LightGreen),
-            PomodoroState::LongBreak => ("LONG BREAK", Color::LightCyan),
+        let (label, label_width) = &self.state_labels[&state];
+        let color = match state {
+            PomodoroState::Focus => Color::LightRed,
+            PomodoroState::ShortBreak => Color::LightGreen,
+            PomodoroState::LongBreak => Color::LightCyan,
         };
-        let label = utils::ascii_future(label);
         let center = Alignment::Center;
 
         if paused {
             let [area_label, area_paused] = Layout::horizontal([
-                Constraint::Length(utils::string_width(&label) as u16),
-                Constraint::Length(67),
+                Constraint::Length(*label_width),
+                Constraint::Length(self.paused_width),
             ])
             .flex(Flex::Center)
             .areas::<2>(area);
 
-            let p_label = Paragraph::new(label)
+            let p_label = Paragraph::new(label.as_str())
                 .style(Style::default().fg(color).add_modifier(Modifier::BOLD))
                 .alignment(center);
 
-            frame.render_widget(&p_label, area_label);
+            frame.render_widget(p_label, area_label);
             frame.render_widget(&self.paused_p, area_paused);
         } else {
-            let p = Paragraph::new(label)
+            let p = Paragraph::new(label.as_str())
                 .style(Style::default().fg(color))
                 .alignment(center);
             frame.render_widget(p, area);
@@ -86,8 +162,7 @@ impl TuiTimerRenderer {
 
     fn timer(&self, frame: &mut Frame, area: Rect, remaining: &Duration, color: Color) {
         let time_str = format_duration_clock(remaining);
-        let ascii = utils::ascii_mono12(time_str);
-
+        let ascii = utils::ascii_mono12(&time_str);
         let width = utils::string_width(&ascii) as u16;
         let height = utils::string_height(&ascii) as u16;
         let area = area.centered(Constraint::Length(width), Constraint::Length(height));
@@ -144,10 +219,10 @@ impl TuiTimerRenderer {
             Span::styled("Backspace", bright),
             Span::styled(": Reset", dim),
             sep.clone(),
-            Span::styled("←→", bright),
+            Span::styled(" ", bright),
             Span::styled(": ±30s", dim),
             sep.clone(),
-            Span::styled("↑↓", bright),
+            Span::styled("", bright),
             Span::styled(": ±1m", dim),
             sep.clone(),
             Span::styled("q", bright),
@@ -170,15 +245,6 @@ impl TuiTimerRenderer {
             Constraint::Length(1), // shortcuts
             Constraint::Fill(1),
         ])
-    }
-
-    fn paused_paragraph() -> Paragraph<'static> {
-        let label = utils::ascii_future(" ( PAUSED )");
-        Paragraph::new(label).style(
-            Style::default()
-                .fg(Color::Yellow)
-                .add_modifier(Modifier::BOLD),
-        )
     }
 }
 
