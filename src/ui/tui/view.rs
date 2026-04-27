@@ -266,23 +266,24 @@ impl TuiView {
         let value = settings.edit_buffer().to_string();
         settings.cancel_editing();
 
+        use SettingsMsg::*;
         let msg = match selected_idx {
             // Timer settings (0-6)
-            0 => Some(SettingsMsg::TimerFocus(parse_duration_minutes(&value))),
-            1 => Some(SettingsMsg::TimerShort(parse_duration_minutes(&value))),
-            2 => Some(SettingsMsg::TimerLong(parse_duration_minutes(&value))),
-            3 => Some(SettingsMsg::TimerLongInterval(value.parse().unwrap_or(4))),
-            4 => Some(SettingsMsg::TimerAutoFocus),
-            5 => Some(SettingsMsg::TimerAutoShort),
-            6 => Some(SettingsMsg::TimerAutoLong),
+            0 => Some(TimerFocus(parse_duration_minutes(&value))),
+            1 => Some(TimerShort(parse_duration_minutes(&value))),
+            2 => Some(TimerLong(parse_duration_minutes(&value))),
+            3 => Some(TimerLongInterval(value.parse().unwrap_or(4))),
+            4 => Some(TimerAutoFocus),
+            5 => Some(TimerAutoShort),
+            6 => Some(TimerAutoLong),
             // Hook settings (7-9)
-            7 => Some(SettingsMsg::HookFocus(value)),
-            8 => Some(SettingsMsg::HookShort(value)),
-            9 => Some(SettingsMsg::HookLong(value)),
-            // Sound settings (10-12)
-            10 => Some(SettingsMsg::SoundFocus(parse_path(&value))),
-            11 => Some(SettingsMsg::SoundShort(parse_path(&value))),
-            12 => Some(SettingsMsg::SoundLong(parse_path(&value))),
+            7 => Some(HookFocus(value)),
+            8 => Some(HookShort(value)),
+            9 => Some(HookLong(value)),
+            // Sound path settings (10-12)
+            10 => Some(SoundPathFocus(parse_path(&value))),
+            11 => Some(SoundPathShort(parse_path(&value))),
+            12 => Some(SoundPathLong(parse_path(&value))),
             _ => return,
         };
 

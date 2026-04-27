@@ -3,11 +3,12 @@ use std::time::Duration;
 
 use crate::config::Config;
 use crate::config::ConfigError;
+use crate::config::Percentage;
 use crate::ui::Update;
 
-pub const SETTINGS_VIEW_ITEMS: u32 = 13;
+pub const SETTINGS_VIEW_ITEMS: u32 = 16;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum SettingsMsg {
     // Timer settings
     TimerFocus(Duration),
@@ -22,10 +23,14 @@ pub enum SettingsMsg {
     HookFocus(String),
     HookShort(String),
     HookLong(String),
-    // Sound settings
-    SoundFocus(Option<PathBuf>),
-    SoundShort(Option<PathBuf>),
-    SoundLong(Option<PathBuf>),
+    // Sound path settings
+    SoundPathFocus(Option<PathBuf>),
+    SoundPathShort(Option<PathBuf>),
+    SoundPathLong(Option<PathBuf>),
+    // Sound path settings
+    SoundVolumeFocus(Percentage),
+    SoundVolumeShort(Percentage),
+    SoundVolumeLong(Percentage),
     // Other
     SaveToDisk,
 }
@@ -75,10 +80,13 @@ impl Update for SettingsUpdate {
             HookShort(s) => hook.short = s,
             HookLong(s) => hook.long = s,
             // Sound
-            SoundFocus(p) => sound.focus = p,
-            SoundShort(p) => sound.short = p,
-            SoundLong(p) => sound.long = p,
+            SoundPathFocus(p) => sound.focus.path = p,
+            SoundPathShort(p) => sound.short.path = p,
+            SoundPathLong(p) => sound.long.path = p,
             SaveToDisk => cmd = SettingsCmd::SavedToDisk(model.save()),
+            SoundVolumeFocus(v) => sound.focus.volume = v,
+            SoundVolumeShort(v) => sound.short.volume = v,
+            SoundVolumeLong(v) => sound.long.volume = v,
         }
         (model, cmd)
     }
