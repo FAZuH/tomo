@@ -6,15 +6,27 @@ use serde::Deserialize;
 use serde::Deserializer;
 use serde::Serialize;
 use serde::Serializer;
+use tracing::debug;
+use tracing::info;
 
-use crate::debug;
-use crate::info;
 use crate::utils;
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
 pub struct Config {
     pub pomodoro: PomodoroConfig,
+    pub logs_path: PathBuf,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        let conf_dir = utils::conf_dir();
+        let logs_path = conf_dir.join("logs");
+        Self {
+            pomodoro: Default::default(),
+            logs_path,
+        }
+    }
 }
 
 impl Config {
@@ -160,11 +172,15 @@ impl Percentage {
     pub fn full() -> Self {
         Self(1.0)
     }
+
+    pub fn volume(&self) -> f32 {
+        self.0
+    }
 }
 
 impl Default for Percentage {
     fn default() -> Self {
-        Self::muted()
+        Self::half()
     }
 }
 

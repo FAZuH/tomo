@@ -1,17 +1,25 @@
 use clap::Parser;
 use tomo::cli::Cli;
 use tomo::config::Config;
-use tomo::error::Error;
+use tomo::error::AppError;
+use tomo::log::setup_logging;
 use tomo::models::Pomodoro;
+use tomo::services::sound::PomodoroNotificationService;
 use tomo::ui::tui::TuiView;
 
-fn main() -> Result<(), Error> {
+fn main() -> Result<(), AppError> {
     let cli = Cli::parse();
     let conf = Config::load()?;
+    setup_logging(&conf.logs_path)?;
 
     let mut model = create_model(&cli, &conf);
     model.start().unwrap();
-    let mut runner = TuiView::new(conf, model).unwrap();
+
+    let sound = Box::new(PomodoroNotificationService::new(
+        &conf.pomodoro.notification,
+    ));
+
+    let mut runner = TuiView::new(conf, model, sound).unwrap();
     runner.run().unwrap();
 
     Ok(())

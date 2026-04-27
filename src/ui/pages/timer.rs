@@ -18,6 +18,8 @@ pub enum TimerMsg {
 pub enum TimerCmd {
     None,
     PromptNextSession,
+    NextSession,
+    ContinuedSession,
 }
 
 pub struct TimerUpdate {}
@@ -42,11 +44,14 @@ impl Update for TimerUpdate {
             TogglePause => model.toggle_pause(),
             SkipSession => model.skip(),
             ResetSession => model.reset(),
-            NextState => model.skip(),
+            NextState => {
+                model.skip();
+                cmd = TimerCmd::ContinuedSession;
+            }
             Tick { auto_next } => {
                 if model.remaining_time().is_zero() {
                     if auto_next {
-                        return Self::update(NextState, model);
+                        cmd = TimerCmd::NextSession;
                     } else {
                         cmd = TimerCmd::PromptNextSession;
                     }
