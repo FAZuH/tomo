@@ -6,54 +6,113 @@ config:
 classDiagram
     direction TD
 
-    class TuiView {
+    class TuiView:::view {
         -router: Router
-        -pomodoro: Pomodoro
-        -config: Config
-        -should_quit: bool
+        -latest_config_save: Option~Config~
+        -terminal: Tui
         -renderer: TuiRenderer
-        -terminal: Terminal
-        -needs_redraw: bool
-        +new(config, pomodoro)
-        +run()
-        -run_loop()
-        -handle_key_event(input)
-        -handle_timer(input)
-        -handle_settings(input)
-        -handle_settings_edit(input)
-        -save_settings()
-        -render_terminal()
+        -sound: Box~dyn SoundService~
+        -tick: TickHandler
+        -toast: ToastHandler
+        +new(sound)
+        +run(model: AppModel) Result~void, UiError~
+        -run_loop(model: AppModel)
+        -get_input() Option~Event~
+        -tick(model: AppModel) AppModel
+        -handle_timer_cmd(cmd: TimerCmd, model: AppModel) AppModel
+        -on_session_end(model: &AppModel)
+        -run_hooks(conf: &Hooks, curr_state: State)
+        -send_notification(next_state: State)
+        -play_sound(next_state: State)
+        -show_toast(message, type)
+        -next_session(model: AppModel) AppModel
+        -should_auto_next(curr_state: State, timer: &Timers) bool
+        -render_terminal(model: &AppModel)
+        -handle_key_event(input: Event, model: AppModel) AppModel
+        -handle_timer(event: Event, model: AppModel) AppModel
+        -handle_timer_nextstate_prompt(event: Event, model: AppModel) AppModel
+        -handle_settings(event: Event, model: AppModel) AppModel
+        -handle_settings_edit(event: Event, model: AppModel) AppModel
+        -update_settings(model: AppModel) AppModel
+        -msg_from_edit(value: String, selected_idx: u32) Option~SettingsMsg~
+        -save_settings(model: &AppModel)
+        -check_settings_updated(model: &AppModel) bool
+        -snapshot_settings(model: &AppModel)
+        -quit()
+        -parse_path(s) Option~PathBuf~
+        -parse_dur(s) Option~Duration~
+        -parse_vol(s) Option~Percentage~
+        -try_parse(s, f, label) Option~T~
     }
 
-    class Router {
-        -active_page: Option~Page~
-        +navigate(nav)
-        +active_page() Option~Page~
-    }
-
-    class Update~Msg, Model~ {
+    class View~Model~:::view {
         <<trait>>
-        +update(msg: Msg, model: Model) Model
+        +run(model: Model) Result~void, UiError~
     }
 
-    class TimerUpdate {
-        +update(msg: TimerMsg, model: Pomodoro) Pomodoro
+    class AppModel:::model {
+        +timer: Pomodoro
+        +settings: Config
     }
 
-    class SettingsUpdate {
-        +update(msg: SettingsMsg, model: Config) Config
+    class Router:::controller {
+        -active_page: Option~Page~
+        +new(page: Page)
+        +navigate(nav)
+        +quit()
+        +active_page() Option~Page~
+        +is_quit() bool
     }
 
-    class TimerMsg {
+    class Page:::action {
+        <<enumeration>>
+        Timer
+        Settings
+    }
+
+    class Navigation:::action {
+        <<enumeration>>
+        Quit
+        Stay
+        GoTo(Page)
+    }
+
+    class Update~Msg, Model, Cmd~:::controller {
+        <<trait>>
+        +update(msg: Msg, model: Model) (Model, Cmd)
+    }
+
+    class TimerUpdate:::controller {
+        +new()
+        +tick(auto_next: bool, model: &Pomodoro) TimerCmd
+        +update(msg: TimerMsg, model: Pomodoro) (Pomodoro, TimerCmd)
+    }
+
+    class TimerMsg:::action {
         <<enumeration>>
         Add(Duration)
         Subtract(Duration)
         TogglePause
         SkipSession
         ResetSession
+        Tick(bool)
+        NextState
     }
 
-    class SettingsMsg {
+    class TimerCmd:::action {
+        <<enumeration>>
+        None
+        PromptNextSession
+        NextSession
+        SessionContinued
+    }
+
+    class SettingsUpdate:::controller {
+        +new()
+        +update(msg: SettingsMsg, model: Config) (Config, SettingsCmd)
+    }
+
+    class SettingsMsg:::action {
         <<enumeration>>
         TimerFocus(Duration)
         TimerShort(Duration)
@@ -65,48 +124,125 @@ classDiagram
         HookFocus(String)
         HookShort(String)
         HookLong(String)
-        SoundFocus(Option~PathBuf~)
-        SoundShort(Option~PathBuf~)
-        SoundLong(Option~PathBuf~)
+        AlarmPathFocus(Option~PathBuf~)
+        AlarmPathShort(Option~PathBuf~)
+        AlarmPathLong(Option~PathBuf~)
+        AlarmVolumeFocus(Percentage)
+        AlarmVolumeShort(Percentage)
+        AlarmVolumeLong(Percentage)
     }
 
-    class Page {
+    class SettingsCmd:::action {
         <<enumeration>>
-        Timer
-        Settings
+        None
     }
 
-    class Navigation {
+    class Pomodoro:::model {
+        +new(focus, long, short, interval)
+        +start() Result~void, PomodoroError~
+        +add(Duration)
+        +subtract(Duration)
+        +pause() Result~void, PomodoroError~
+        +resume() Result~void, PomodoroError~
+        +toggle_pause()
+        +skip()
+        +reset()
+        +state() State
+        +is_running() bool
+        +remaining_time() Duration
+        +next_state() State
+    }
+
+    class State:::state {
         <<enumeration>>
-        Quit
-        Stay
-        GoTo(Page)
+        Focus
+        ShortBreak
+        LongBreak
     }
 
-    class Pomodoro {
-        -focus: Duration
-        -state: PomodoroState
-        +tick()
-        +start()
-        ...()
-    }
-
-    class Config {
+    class Config:::model {
         +pomodoro: PomodoroConfig
-        +load()
-        ...()
+        +logs_path: PathBuf
+        +load() Result~Config, ConfigError~
+        +save() Result~void, ConfigError~
     }
 
-    class TuiRenderer {
+    class TuiRenderer:::renderCmd {
         +timer: TuiTimerRenderer
         +settings: TuiSettingsRenderer
         +flush(frame, router, pomodoro, config)
     }
 
+    class TuiTimerRenderer:::renderCmd {
+        -prompt_next_session: bool
+        -layout: Layout
+        -paused_p: Paragraph
+        -paused_width: u16
+        -state_labels: HashMap~State, (String, u16)~
+        +new()
+        +render(frame, pomodoro)
+        +set_prompt_next_session(val: bool)
+        +prompt_next_session() bool
+    }
+
+    class TuiSettingsRenderer:::renderCmd {
+        -scroll_state: ScrollViewState
+        -selected_idx: u32
+        -prompt: Option~SettingsPrompt~
+        -has_unsaved_changes: bool
+        +new()
+        +render(frame, config)
+        +select_up()
+        +select_down()
+        +scroll_up()
+        +scroll_down()
+        +start_editing_for_field(config: &PomodoroConfig)
+        +cancel_editing()
+        +selected_idx() u32
+        +is_editing() bool
+        +prompt_state_mut() Option~&mut SettingsPrompt~
+        +take_edit_value() String
+        +set_has_unsaved_changes(state: bool)
+    }
+
+    class Tui:::view {
+        -terminal: Terminal~CrosstermBackend~Stderr~~
+        +new() Result~Tui, TuiError~
+        -init()
+        -cleanup()
+    }
+
+    class TickHandler:::controller {
+        -last_tick: Option~Instant~
+        -tick_rate: Duration
+        +new_tick() bool
+    }
+
+    class ToastHandler:::view {
+        -engine: ToastEngine
+        -rx: mpsc::Receiver~ToastMessage~
+        +new()
+        +tick()
+        +show_toast(toast)
+        +set_area(area)
+        +render(area, buffer)
+    }
+
+    class SoundService:::controller {
+        <<trait>>
+        +set_sound(sound_type: State)
+        +play() Result~void, SoundError~
+        +is_playing() bool
+    }
+
+    TuiView ..|> View
     TuiView *-- Router
-    TuiView *-- Pomodoro
-    TuiView *-- Config
+    TuiView *-- AppModel : consumes
     TuiView *-- TuiRenderer
+    TuiView *-- Tui
+    TuiView *-- TickHandler
+    TuiView *-- ToastHandler
+    TuiView *-- SoundService
 
     Router --> Page
     Router --> Navigation
@@ -116,14 +252,26 @@ classDiagram
 
     TimerUpdate ..> Pomodoro : updates
     TimerUpdate ..> TimerMsg : receives
+    TimerUpdate ..> TimerCmd : produces
     SettingsUpdate ..> Config : updates
     SettingsUpdate ..> SettingsMsg : receives
+    SettingsUpdate ..> SettingsCmd : produces
 
     TuiView ..> TimerUpdate : calls
     TuiView ..> SettingsUpdate : calls
 
+    TuiRenderer ..> TuiTimerRenderer
+    TuiRenderer ..> TuiSettingsRenderer
     TuiRenderer ..> Pomodoro : reads
     TuiRenderer ..> Config : reads
+    TuiRenderer ..> Router : reads page
+
+    TuiTimerRenderer ..> State : reads
+    TuiSettingsRenderer ..> Config : reads
+
+    AppModel ..> Pomodoro
+    AppModel ..> Config
+    Pomodoro ..> State : state
 
     classDef view fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px,color:#000
     classDef controller fill:#bbdefb,stroke:#1565c0,stroke-width:2px,color:#000

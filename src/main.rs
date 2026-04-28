@@ -9,7 +9,8 @@ use tomo::ui::AppModel;
 use tomo::ui::View;
 use tomo::ui::tui::TuiView;
 
-fn main() -> Result<(), AppError> {
+#[tokio::main]
+async fn main() -> Result<(), AppError> {
     let cli = Cli::parse();
     let conf = Config::load()?;
     setup_logging(&conf.logs_path)?;

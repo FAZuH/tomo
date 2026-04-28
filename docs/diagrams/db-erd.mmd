@@ -9,27 +9,29 @@ erDiagram
     tasks {
         INTEGER id PK
         TEXT name
-        TEXT description
-        TIMESTAMP deadline
-        INTEGER parent_id FK
-        INTEGER project_id FK
+        TEXT description "Nullable"
+        TIMESTAMP deadline "Nullable"
+        INTEGER parent_id FK "Nullable"
+        INTEGER project_id FK "Nullable"
     }
     tags {
         INTEGER id PK
         TEXT name
-        TEXT description
+        TEXT description "Nullable"
     }
-    projects { 
+    projects {
         INTEGER id PK
         TEXT name
-        TEXT description
+        TEXT description "Nullable"
     }
     sessions {
         INTEGER id PK
         INTEGER task_id FK
         TIMESTAMP start_at
         TIMESTAMP updated_at
-        TIMESTAMP end_at
+        TIMESTAMP end_at "Nullable"
+        TEXT pomodoro_state
+        BOOL paused
     }
     %% Junction Tables
     task_tags:::junction {
@@ -42,11 +44,11 @@ erDiagram
     }
 
     tasks ||--o{ sessions : "sessions"
-    tasks }o..o| projects : "project of"
-    tasks }o..|| tasks : "subtask"
-    
+    tasks }o--o| projects : "project of"
+    tasks }o--o| tasks : "subtask"
+
     tasks ||--o{ task_tags : "has"
     tags ||--o{ task_tags : "assigned to"
-    
+
     projects ||--o{ project_default_tags : "has"
     tags ||--o{ project_default_tags : "default for"

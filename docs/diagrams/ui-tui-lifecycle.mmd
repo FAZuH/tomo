@@ -2,47 +2,82 @@ sequenceDiagram
     autonumber
     participant U as User
     participant V as TuiView
+    participant TH as TickHandler
     participant TU as TimerUpdate
     participant SU as SettingsUpdate
     participant TR as TuiRenderer
+    participant T as ToastHandler
+    participant S as SoundService
 
     rect rgb(180, 200, 220)
         note right of V: INITIALIZATION
-        V->>V: enable_raw_mode()
+        V->>V: Router::new(Page::Timer)
         V->>TR: TuiRenderer::new()
         activate TR
         TR-->>V: renderer
         deactivate TR
+        V->>V: snapshot_settings(&model)
     end
 
     rect rgb(180, 220, 190)
         note right of V: MAIN LOOP (TICK)
         loop Until Quit
-            V->>V: pomodoro.tick()
-            
-            opt Needs Redraw
+            V->>TH: new_tick()
+            TH-->>V: redraw?
+
+            opt Has Input
+                V->>V: get_input()
+                alt Page::Timer
+                    V->>TU: update(TimerMsg, pomodoro)
+                    activate TU
+                    TU-->>V: (new_pomodoro, TimerCmd)
+                    deactivate TU
+                    V->>V: handle_timer_cmd(TimerCmd, model)
+                else Page::Settings
+                    V->>V: handle_settings(input, model)
+                    alt Is Editing
+                        V->>V: handle_settings_edit(input, model)
+                        V->>SU: update(SettingsMsg, config)
+                        activate SU
+                        SU-->>V: (new_config, SettingsCmd)
+                        deactivate SU
+                    else Is Navigating
+                        V->>SU: update(SettingsMsg, config)
+                        activate SU
+                        SU-->>V: (new_config, SettingsCmd)
+                        deactivate SU
+                    end
+                end
+            end
+
+            opt Redraw
+                V->>V: tick(model)
+                V->>TU: tick(auto_next, &model.timer)
+                TU-->>V: TimerCmd
+                V->>V: handle_timer_cmd(TimerCmd, model)
+
+                opt TimerCmd::PromptNextSession
+                    V->>TR: set_prompt_next_session(true)
+                end
+
+                opt TimerCmd::NextSession
+                    V->>V: on_session_end(&model)
+                    V->>S: play_sound(next_state)
+                    V->>V: send_notification(next_state)
+                    V->>V: run_hooks(hooks, curr_state)
+                    V->>TU: update(NextState, pomodoro)
+                    TU-->>V: (new_pomodoro, SessionContinued)
+                end
+
                 V->>TR: flush(frame, router, pomodoro, config)
                 activate TR
                 TR-->>V: frame drawn
                 deactivate TR
+                V->>T: tick()
+                V->>T: render(area, buffer)
                 V->>V: terminal.draw()
             end
 
-            V->>V: poll input
-            opt Has Input
-                alt Page::Timer
-                    V->>TU: update(TimerMsg, pomodoro)
-                    activate TU
-                    TU-->>V: new_pomodoro
-                    deactivate TU
-                else Page::Settings
-                    V->>SU: update(SettingsMsg, config)
-                    activate SU
-                    SU-->>V: new_config
-                    deactivate SU
-                else Navigation
-                    V->>V: router.navigate(GoTo or Quit)
-                end
-            end
+            V->>V: sleep(10ms)
         end
     end

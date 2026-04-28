@@ -6,6 +6,16 @@ config:
 classDiagram
     direction TD
 
+    class View~Model~:::view {
+        <<trait>>
+        +run(model: Model) Result~void, UiError~
+    }
+
+    class AppModel:::model {
+        +timer: Pomodoro
+        +settings: Config
+    }
+
     class Page:::action {
         <<enumeration>>
         Timer
@@ -20,19 +30,24 @@ classDiagram
     }
 
     class Router:::controller {
-        -active_page : Option~Page~
+        -active_page: Option~Page~
+        +new(page: Page)
         +navigate(nav: Navigation)
+        +quit()
         +active_page() Option~Page~
+        +is_quit() bool
     }
 
-    class Update~Msg, Model~:::controller {
+    class Update~Msg, Model, Cmd~:::controller {
         <<trait>>
-        +update(msg: Msg, model: Model) Model
+        +update(msg: Msg, model: Model) (Model, Cmd)
     }
 
     namespace Timer {
         class TimerUpdate:::controller {
-            +update(msg: TimerMsg, model: Pomodoro) Pomodoro
+            +new()
+            +tick(auto_next: bool, model: &Pomodoro) TimerCmd
+            +update(msg: TimerMsg, model: Pomodoro) (Pomodoro, TimerCmd)
         }
 
         class TimerMsg:::action {
@@ -42,12 +57,23 @@ classDiagram
             TogglePause
             SkipSession
             ResetSession
+            Tick(bool)
+            NextState
+        }
+
+        class TimerCmd:::action {
+            <<enumeration>>
+            None
+            PromptNextSession
+            NextSession
+            SessionContinued
         }
     }
 
     namespace Settings {
         class SettingsUpdate:::controller {
-            +update(msg: SettingsMsg, model: Config) Config
+            +new()
+            +update(msg: SettingsMsg, model: Config) (Config, SettingsCmd)
         }
 
         class SettingsMsg:::action {
@@ -62,29 +88,53 @@ classDiagram
             HookFocus(String)
             HookShort(String)
             HookLong(String)
-            SoundFocus(Option~PathBuf~)
-            SoundShort(Option~PathBuf~)
-            SoundLong(Option~PathBuf~)
+            AlarmPathFocus(Option~PathBuf~)
+            AlarmPathShort(Option~PathBuf~)
+            AlarmPathLong(Option~PathBuf~)
+            AlarmVolumeFocus(Percentage)
+            AlarmVolumeShort(Percentage)
+            AlarmVolumeLong(Percentage)
+        }
+
+        class SettingsCmd:::action {
+            <<enumeration>>
+            None
         }
     }
 
     namespace Model {
         class Pomodoro:::model {
-            +focus : Duration
-            +long_break : Duration
-            +short_break : Duration
-            +state : PomodoroState
-            +running : bool
+            -focus: Duration
+            -long_break: Duration
+            -short_break: Duration
+            -long_interval: u32
+            -total_sessions: u32
+            -focus_sessions: u32
+            -accumulated: Duration
+            -running: bool
+            -state: State
+            -anchor: Option~Instant~
+            -frozen_remaining: Duration
+            +new(focus, long, short, interval)
             +start() Result~void, PomodoroError~
-            +tick() Result~void, PomodoroError~
-            +toggle_pause()
-            +skip() Result~void, PomodoroError~
-            +reset() Result~void, PomodoroError~
             +add(Duration)
             +subtract(Duration)
+            +pause() Result~void, PomodoroError~
+            +resume() Result~void, PomodoroError~
+            +toggle_pause()
+            +skip()
+            +reset()
+            +state() State
+            +is_running() bool
+            +focus_sessions() u32
+            +total_sessions() u32
+            +remaining_time() Duration
+            +total_time() Duration
+            +session_duration() Duration
+            +next_state() State
         }
 
-        class PomodoroState:::state {
+        class State:::state {
             <<enumeration>>
             Focus
             ShortBreak
@@ -92,9 +142,48 @@ classDiagram
         }
 
         class Config:::model {
-            +pomodoro : PomodoroConfig
+            +pomodoro: PomodoroConfig
+            +logs_path: PathBuf
             +load() Result~Config, ConfigError~
             +save() Result~void, ConfigError~
+        }
+
+        class PomodoroConfig:::model {
+            +timer: Timers
+            +hook: Hooks
+            +alarm: Alarms
+        }
+
+        class Timers:::model {
+            +focus: Duration
+            +short: Duration
+            +long: Duration
+            +long_interval: u32
+            +auto_focus: bool
+            +auto_short: bool
+            +auto_long: bool
+        }
+
+        class Hooks:::model {
+            +focus: String
+            +short: String
+            +long: String
+        }
+
+        class Alarms:::model {
+            +focus: Alarm
+            +short: Alarm
+            +long: Alarm
+        }
+
+        class Alarm:::model {
+            +path: Option~PathBuf~
+            +volume: Percentage
+        }
+
+        class Percentage:::model {
+            +new(perc: f32)
+            +volume() f32
         }
     }
 
@@ -106,9 +195,18 @@ classDiagram
 
     TimerUpdate ..> Pomodoro : mutates
     TimerUpdate ..> TimerMsg : receives
+    TimerUpdate ..> TimerCmd : produces
     SettingsUpdate ..> Config : mutates
     SettingsUpdate ..> SettingsMsg : receives
-    Pomodoro ..> PomodoroState : state
+    SettingsUpdate ..> SettingsCmd : produces
+    Pomodoro ..> State : state
+    Config ..> PomodoroConfig
+    PomodoroConfig ..> Timers
+    PomodoroConfig ..> Hooks
+    PomodoroConfig ..> Alarms
+    Alarms ..> Alarm
+    AppModel ..> Pomodoro
+    AppModel ..> Config
 
     classDef view fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px,color:#000
     classDef controller fill:#bbdefb,stroke:#1565c0,stroke-width:2px,color:#000

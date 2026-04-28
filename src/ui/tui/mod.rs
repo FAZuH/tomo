@@ -1,5 +1,6 @@
 pub mod backend;
 pub mod renderer;
+pub mod toasts;
 pub mod view;
 
 pub use view::TuiView;

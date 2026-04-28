@@ -6,10 +6,11 @@ config:
 classDiagram
     direction TD
 
-    class Error {
+    class AppError {
         +Cli(CliArgumentError)
-        +Config(ConfigError)
+        +ConfigError(String)
         +Ui(UiError)
+        +InvalidState(String)
     }
 
     class CliArgumentError {
@@ -23,13 +24,12 @@ classDiagram
     }
 
     class UiError {
-        +Tui(TuiError)
-        +App(AppError)
-        +Build(AppBuildError)
+        +TuiError(TuiError)
     }
 
     class TuiError {
         +Io(io::Error)
+        +InitializeError(String)
     }
 
     class PomodoroError {
@@ -38,26 +38,28 @@ classDiagram
         +UnexpectedState(String)
     }
 
-    class AppError {
-        +Pomodoro(PomodoroError)
+    class SoundError {
+        +DeviceSinkError(DeviceSinkError)
+        +ConfigError(String)
+        +Decode(DecoderError)
     }
 
-    class AppBuildError {
-        +MissingConfig
-        +MissingPomodoro
-        +MissingHomeView
-        +MissingTimerView
-        +MissingSettingsView
+    class RepoError {
+        +Connection(String)
     }
 
-    Error ..> CliArgumentError
-    Error ..> ConfigError
-    Error ..> UiError
+    AppError ..> CliArgumentError
+    AppError ..> ConfigError
+    AppError ..> UiError
+    AppError ..> InvalidState
 
     UiError ..> TuiError
-    UiError ..> AppError
-    UiError ..> AppBuildError
 
-    TuiError ..> AppError
+    TuiError ..> Io
 
-    AppError ..> PomodoroError
+    PomodoroError ..> UnexpectedState
+
+    SoundError ..> DeviceSinkError
+    SoundError ..> Decode
+
+    RepoError ..> Connection

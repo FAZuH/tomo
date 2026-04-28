@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+use std::path::PathBuf;
 use std::thread::sleep;
 use std::time::Duration;
 use std::time::Instant;
@@ -6,12 +8,15 @@ use crossterm::event::Event;
 use crossterm::event::KeyCode;
 use crossterm::event::MouseEventKind;
 use crossterm::event::{self};
-use log::error;
+use ratatui::widgets::Widget;
+use ratatui_toaster::ToastBuilder;
+use ratatui_toaster::ToastType;
 use tui_widgets::prompts::State as PromptState;
 use tui_widgets::prompts::Status;
 
 use crate::config::Config;
 use crate::config::Percentage;
+use crate::config::pomodoro::Hooks;
 use crate::config::pomodoro::Timers;
 use crate::models::pomodoro::State;
 use crate::services::SoundService;
@@ -27,6 +32,7 @@ use crate::ui::router::Router;
 use crate::ui::tui::TuiError;
 use crate::ui::tui::backend::Tui;
 use crate::ui::tui::renderer::TuiRenderer;
+use crate::ui::tui::toasts::ToastHandler;
 use crate::ui::update::settings::SettingsMsg;
 use crate::ui::update::settings::SettingsUpdate;
 use crate::ui::update::timer::TimerCmd;
@@ -38,10 +44,13 @@ type Sound = Box<dyn SoundService<SoundType = State>>;
 pub struct TuiView {
     router: Router,
     latest_config_save: Option<Config>,
-    renderer: TuiRenderer,
+
     terminal: Tui,
+
+    renderer: TuiRenderer,
     sound: Sound,
     tick: TickHandler,
+    toast: ToastHandler,
 }
 
 impl View for TuiView {
@@ -64,6 +73,7 @@ impl TuiView {
             terminal,
             sound,
             tick: TickHandler::default(),
+            toast: ToastHandler::default(),
         })
     }
 
@@ -79,7 +89,7 @@ impl TuiView {
             }
 
             if redraw {
-                model = self.tick(model)?;
+                model = self.tick(model);
                 self.render_terminal(&model)?;
             }
             sleep(Duration::from_millis(10));
@@ -95,14 +105,15 @@ impl TuiView {
         }
     }
 
-    fn tick(&mut self, mut model: AppModel) -> Result<AppModel, TuiError> {
+    fn tick(&mut self, mut model: AppModel) -> AppModel {
+        self.toast.tick();
         let cmd = TimerUpdate::tick(
             self.should_auto_next(model.timer.state(), &model.settings.pomodoro.timer),
             &model.timer,
         );
 
         model = self.handle_timer_cmd(cmd, model);
-        Ok(model)
+        model
     }
 
     fn handle_timer_cmd(&mut self, cmd: TimerCmd, mut model: AppModel) -> AppModel {
@@ -111,12 +122,12 @@ impl TuiView {
             TimerCmd::PromptNextSession => {
                 if !self.renderer.timer.prompt_next_session() {
                     // only runs on once per session
-                    model = self.on_session_end(model);
+                    self.on_session_end(&model);
                 }
                 self.renderer.timer.set_prompt_next_session(true);
             }
             TimerCmd::NextSession => {
-                model = self.on_session_end(model);
+                self.on_session_end(&model);
                 model = self.next_session(model);
             }
             TimerCmd::SessionContinued => {}
@@ -124,30 +135,34 @@ impl TuiView {
         model
     }
 
-    fn on_session_end(&mut self, mut model: AppModel) -> AppModel {
-        // TODO: Handle errs
-        model = self.run_hooks(model);
+    fn on_session_end(&mut self, model: &AppModel) {
+        self.run_hooks(&model.settings.pomodoro.hook, model.timer.state());
         self.play_sound(model.timer.next_state());
         self.send_notification(model.timer.next_state());
-        model
     }
 
-    fn run_hooks(&self, model: AppModel) -> AppModel {
-        run_cmds(&model.settings.pomodoro.hook, model.timer.state());
-        model
+    fn run_hooks(&self, conf: &Hooks, curr_state: State) {
+        run_cmds(conf, curr_state);
     }
 
-    fn send_notification(&self, next_state: State) {
-        notify(next_state).unwrap();
+    fn send_notification(&mut self, next_state: State) {
+        if let Err(e) = notify(next_state) {
+            self.show_toast(e.to_string(), ToastType::Error);
+        }
     }
 
     fn play_sound(&mut self, next_state: State) {
         if !self.sound.is_playing() {
             self.sound.set_sound(next_state);
             if let Err(e) = self.sound.play() {
-                error!("{e}")
+                self.show_toast(e.to_string(), ToastType::Error);
             }
         }
+    }
+
+    fn show_toast(&mut self, message: impl Into<Cow<'static, str>>, r#type: ToastType) {
+        self.toast
+            .show_toast(ToastBuilder::new(message.into()).toast_type(r#type));
     }
 
     fn next_session(&mut self, mut model: AppModel) -> AppModel {
@@ -165,8 +180,11 @@ impl TuiView {
 
     fn render_terminal(&mut self, model: &AppModel) -> Result<(), TuiError> {
         self.terminal.draw(|f| {
+            let area = f.area();
             self.renderer
-                .flush(f, &self.router, &model.timer, &model.settings)
+                .flush(f, &self.router, &model.timer, &model.settings);
+            self.toast.set_area(area);
+            self.toast.render(area, f.buffer_mut());
         })?;
         Ok(())
     }
@@ -178,14 +196,14 @@ impl TuiView {
     ) -> Result<AppModel, TuiError> {
         // Handle settings input directly on the renderer
         match self.router.active_page() {
-            Some(Page::Settings) => model = self.handle_settings(input, model)?,
-            Some(Page::Timer) => model = self.handle_timer(input, model)?,
+            Some(Page::Settings) => model = self.handle_settings(input, model),
+            Some(Page::Timer) => model = self.handle_timer(input, model),
             None => self.quit(),
         }
         Ok(model)
     }
 
-    fn handle_timer(&mut self, event: Event, mut model: AppModel) -> Result<AppModel, TuiError> {
+    fn handle_timer(&mut self, event: Event, mut model: AppModel) -> AppModel {
         use KeyCode as K;
         use TimerMsg::*;
 
@@ -225,14 +243,10 @@ impl TuiView {
                 _ => {}
             }
         }
-        Ok(model)
+        model
     }
 
-    fn handle_timer_nextstate_prompt(
-        &mut self,
-        event: Event,
-        mut model: AppModel,
-    ) -> Result<AppModel, TuiError> {
+    fn handle_timer_nextstate_prompt(&mut self, event: Event, mut model: AppModel) -> AppModel {
         if let Event::Key(key) = event {
             match key.code {
                 KeyCode::Enter | KeyCode::Char('y') => {
@@ -243,11 +257,11 @@ impl TuiView {
                 _ => {}
             }
         }
-        Ok(model)
+        model
     }
 
     /// Handle settings page input directly, mutating renderer state
-    fn handle_settings(&mut self, event: Event, mut model: AppModel) -> Result<AppModel, TuiError> {
+    fn handle_settings(&mut self, event: Event, mut model: AppModel) -> AppModel {
         let settings = &mut self.renderer.settings;
 
         // When editing, handle text input
@@ -283,14 +297,10 @@ impl TuiView {
             _ => {}
         }
 
-        Ok(model)
+        model
     }
 
-    fn handle_settings_edit(
-        &mut self,
-        event: Event,
-        mut model: AppModel,
-    ) -> Result<AppModel, TuiError> {
+    fn handle_settings_edit(&mut self, event: Event, mut model: AppModel) -> AppModel {
         let settings = &mut self.renderer.settings;
 
         if let Event::Key(key) = event
@@ -308,8 +318,7 @@ impl TuiView {
                 _ => {}
             }
         }
-
-        Ok(model)
+        model
     }
 
     fn update_settings(&mut self, mut model: AppModel) -> AppModel {
@@ -318,34 +327,12 @@ impl TuiView {
         let value = settings.take_edit_value();
         settings.cancel_editing();
 
-        use SettingsMsg::*;
-        let msg = match selected_idx {
-            // Timer settings (0-6)
-            0 => Some(TimerFocus(parse_duration_minutes(&value))),
-            1 => Some(TimerShort(parse_duration_minutes(&value))),
-            2 => Some(TimerLong(parse_duration_minutes(&value))),
-            3 => Some(TimerLongInterval(value.parse().unwrap_or(4))),
-            4 => Some(TimerAutoFocus),
-            5 => Some(TimerAutoShort),
-            6 => Some(TimerAutoLong),
-            // Hook settings (7-9)
-            7 => Some(HookFocus(value)),
-            8 => Some(HookShort(value)),
-            9 => Some(HookLong(value)),
-            // Alarm path settings (10-12)
-            10 => Some(AlarmPathFocus(parse_path(&value))),
-            11 => Some(AlarmPathShort(parse_path(&value))),
-            12 => Some(AlarmPathLong(parse_path(&value))),
-            // Alarm volume settings (10-12)
-            13 => Some(AlarmVolumeFocus(parse_volume(&value))),
-            14 => Some(AlarmVolumeShort(parse_volume(&value))),
-            15 => Some(AlarmVolumeLong(parse_volume(&value))),
-            _ => return model,
+        let msg = match self.msg_from_edit(value, selected_idx) {
+            Some(msg) => msg,
+            None => return model,
         };
 
-        if let Some(m) = msg {
-            (model.settings, _) = SettingsUpdate::update(m, model.settings);
-        }
+        (model.settings, _) = SettingsUpdate::update(msg, model.settings);
 
         self.renderer
             .settings
@@ -353,13 +340,48 @@ impl TuiView {
         model
     }
 
-    fn save_settings(&mut self, model: &AppModel) {
-        model.settings.save().unwrap();
-        self.renderer.settings.set_has_unsaved_changes(false);
-        self.snapshot_settings(model);
+    fn msg_from_edit(&mut self, value: String, selected_idx: u32) -> Option<SettingsMsg> {
+        use SettingsMsg::*;
+        let msg = match selected_idx {
+            // Timer settings (0-6)
+            0 => TimerFocus(self.parse_dur(value)?),
+            1 => TimerShort(self.parse_dur(value)?),
+            2 => TimerLong(self.parse_dur(value)?),
+            3 => TimerLongInterval(self.try_parse(value, |s| s.parse::<u32>(), "integer")?),
+            4 => TimerAutoFocus,
+            5 => TimerAutoShort,
+            6 => TimerAutoLong,
+            // Hook settings (7-9)
+            7 => HookFocus(value),
+            8 => HookShort(value),
+            9 => HookLong(value),
+            // Alarm path settings (10-12)
+            10 => AlarmPathFocus(self.parse_path(value)),
+            11 => AlarmPathShort(self.parse_path(value)),
+            12 => AlarmPathLong(self.parse_path(value)),
+            // Alarm volume settings (10-12)
+            13 => AlarmVolumeFocus(self.parse_vol(value)?),
+            14 => AlarmVolumeShort(self.parse_vol(value)?),
+            15 => AlarmVolumeLong(self.parse_vol(value)?),
+            _ => return None,
+        };
+        Some(msg)
     }
 
-    // Compare current config with when it was latest saved.
+    fn save_settings(&mut self, model: &AppModel) {
+        match model.settings.save() {
+            Ok(()) => {
+                self.renderer.settings.set_has_unsaved_changes(false);
+                self.snapshot_settings(model);
+                self.show_toast("Settings saved!", ToastType::Success);
+            }
+            Err(e) => {
+                self.show_toast(format!("Failed to save: {e}"), ToastType::Error);
+            }
+        }
+    }
+
+    /// Compare current config with when it was latest saved.
     fn check_settings_updated(&self, model: &AppModel) -> bool {
         if let Some(last) = &self.latest_config_save {
             return model.settings != *last;
@@ -367,6 +389,9 @@ impl TuiView {
         true
     }
 
+    /// Snapshot current settings.
+    ///
+    /// Use with [`Self::check_settings_updated`]
     fn snapshot_settings(&mut self, model: &AppModel) {
         self.latest_config_save = Some(model.settings.clone())
     }
@@ -374,28 +399,48 @@ impl TuiView {
     fn quit(&mut self) {
         self.router.navigate(Navigation::Quit);
     }
-}
 
-// TODO: show error instead of default
-fn parse_duration_minutes(s: &str) -> Duration {
-    s.parse::<u64>()
-        .map(|m| Duration::from_secs(m * 60))
-        .unwrap_or(Duration::from_secs(25 * 60))
-}
-
-fn parse_path(s: &str) -> Option<std::path::PathBuf> {
-    if s.is_empty() {
-        None
-    } else {
-        Some(std::path::PathBuf::from(s))
+    fn parse_path(&mut self, s: impl AsRef<str>) -> Option<PathBuf> {
+        let s = s.as_ref();
+        if s.is_empty() {
+            None
+        } else {
+            let path = PathBuf::from(s);
+            if !path.exists() {
+                self.show_toast("Path does not exist", ToastType::Warning);
+            }
+            Some(path)
+        }
     }
-}
 
-fn parse_volume(s: &str) -> Percentage {
-    if s.is_empty() {
-        Percentage::default()
-    } else {
-        Percentage::try_from(s).unwrap_or_default()
+    fn parse_dur(&mut self, s: impl AsRef<str>) -> Option<Duration> {
+        self.try_parse(s, |s| s.parse::<u64>(), "integer")
+            .map(|val| Duration::from_secs(val * 60))
+    }
+
+    fn parse_vol(&mut self, s: impl AsRef<str>) -> Option<Percentage> {
+        let s = s.as_ref();
+        if s.is_empty() {
+            Some(Percentage::default())
+        } else {
+            self.try_parse(s, |s| Percentage::try_from(s), "percent")
+        }
+    }
+
+    fn try_parse<T, E: std::fmt::Debug>(
+        &mut self,
+        s: impl AsRef<str>,
+        f: impl for<'a> FnOnce(&'a str) -> Result<T, E>,
+        label: &str,
+    ) -> Option<T> {
+        let s = s.as_ref();
+        f(s).map_err(|e| {
+            self.show_toast(
+                format!("Failed converting {s} to {label}: {e:?}"),
+                ToastType::Error,
+            );
+        })
+        .ok()
     }
 }
 

@@ -9,7 +9,7 @@ sequenceDiagram
 
     rect rgb(180, 200, 220)
         note right of V: INITIALIZATION
-        V->>R: Router::default()
+        V->>V: Router::new(Page::Timer)
         activate R
         R-->>V: router
         deactivate R
@@ -19,22 +19,25 @@ sequenceDiagram
         note right of V: EVENT LOOP
         loop Every event (tick, input)
             opt On Tick
-                V->>P: tick()
+                V->>TU: tick(auto_next, &pomodoro)
+                TU-->>V: TimerCmd
+                V->>P: apply cmd (e.g. next_state)
             end
             opt On Timer Input
                 V->>V: Map input to TimerMsg
                 V->>TU: update(msg, pomodoro)
                 activate TU
                 TU->>P: apply msg logic
-                TU-->>V: updated_pomodoro
+                TU-->>V: (updated_pomodoro, TimerCmd)
                 deactivate TU
+                V->>V: handle_timer_cmd(TimerCmd)
             end
             opt On Settings Input
                 V->>V: Map input to SettingsMsg
                 V->>SU: update(msg, config)
                 activate SU
                 SU->>C: apply msg logic
-                SU-->>V: updated_config
+                SU-->>V: (updated_config, SettingsCmd)
                 deactivate SU
             end
             opt On Navigation Input
