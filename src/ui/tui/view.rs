@@ -164,7 +164,7 @@ impl TuiView {
     }
 
     fn next_session(&mut self, mut model: AppModel) -> AppModel {
-        (model.timer, _) = TimerUpdate::update(TimerMsg::NextState, model.timer.clone());
+        (model.timer, _) = TimerUpdate::update(TimerMsg::NextState, model.timer);
         model
     }
 
@@ -209,28 +209,26 @@ impl TuiView {
         match input {
             Left | Char('h') => {
                 (model.timer, _) =
-                    TimerUpdate::update(Subtract(Duration::from_secs(30)), model.timer.clone());
+                    TimerUpdate::update(Subtract(Duration::from_secs(30)), model.timer);
             }
             Down | Char('j') => {
                 (model.timer, _) =
-                    TimerUpdate::update(Subtract(Duration::from_secs(60)), model.timer.clone());
+                    TimerUpdate::update(Subtract(Duration::from_secs(60)), model.timer);
             }
             Right | Char('l') => {
-                (model.timer, _) =
-                    TimerUpdate::update(Add(Duration::from_secs(30)), model.timer.clone());
+                (model.timer, _) = TimerUpdate::update(Add(Duration::from_secs(30)), model.timer);
             }
             Up | Char('k') => {
-                (model.timer, _) =
-                    TimerUpdate::update(Add(Duration::from_secs(60)), model.timer.clone());
+                (model.timer, _) = TimerUpdate::update(Add(Duration::from_secs(60)), model.timer);
             }
             Char(' ') => {
-                (model.timer, _) = TimerUpdate::update(TogglePause, model.timer.clone());
+                (model.timer, _) = TimerUpdate::update(TogglePause, model.timer);
             }
             Enter => {
-                (model.timer, _) = TimerUpdate::update(SkipSession, model.timer.clone());
+                (model.timer, _) = TimerUpdate::update(SkipSession, model.timer);
             }
             Backspace => {
-                (model.timer, _) = TimerUpdate::update(ResetSession, model.timer.clone());
+                (model.timer, _) = TimerUpdate::update(ResetSession, model.timer);
             }
             Char('q') => self.quit(),
             Char('s') => self.router.navigate(Navigation::GoTo(Page::Settings)),
@@ -346,7 +344,7 @@ impl TuiView {
         };
 
         if let Some(m) = msg {
-            (model.settings, _) = SettingsUpdate::update(m, model.settings.clone());
+            (model.settings, _) = SettingsUpdate::update(m, model.settings);
         }
 
         self.renderer
@@ -358,7 +356,7 @@ impl TuiView {
     fn save_settings(&mut self, model: &AppModel) {
         model.settings.save().unwrap();
         self.renderer.settings.set_has_unsaved_changes(false);
-        self.latest_config_save = Some(model.settings.clone());
+        self.latest_config_save = Some(model.settings);
     }
 
     // Compare current config with when it was latest saved.
