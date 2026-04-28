@@ -81,7 +81,7 @@ impl SoundService for AlarmService {
     }
 
     fn is_playing(&self) -> bool {
-        !self.sound_thread.is_none()
+        self.sound_thread.is_some()
     }
 
     fn sleep_until_end(&mut self) {
