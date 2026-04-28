@@ -1,10 +1,10 @@
 use std::fs::File;
 use std::thread::JoinHandle;
 
+use log::info;
 use rodio::Decoder;
 use rodio::DeviceSinkBuilder;
 use rodio::Player;
-use tracing::info;
 
 use crate::config::Alarm;
 use crate::config::PomodoroAlarmConfig;

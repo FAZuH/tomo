@@ -2,12 +2,12 @@ use std::fs;
 use std::path::PathBuf;
 use std::time::Duration;
 
+use log::debug;
+use log::info;
 use serde::Deserialize;
 use serde::Deserializer;
 use serde::Serialize;
 use serde::Serializer;
-use tracing::debug;
-use tracing::info;
 
 use crate::utils;
 

@@ -10,7 +10,7 @@ pub fn run_cmds(conf: &PomodoroHookConfig, state: PomodoroState) {
 
     std::thread::spawn(move || {
         let Some(parts) = shlex::split(&cmd) else {
-            tracing::error!("failed to parse hook command: {}", cmd);
+            log::error!("failed to parse hook command: {}", cmd);
             return;
         };
         let mut parts = parts.into_iter();
