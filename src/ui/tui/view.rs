@@ -88,7 +88,7 @@ impl TuiView {
             }
 
             if redraw {
-                model = self.tick(model)?;
+                model = self.tick(model);
                 self.render_terminal(&model)?;
             }
             sleep(Duration::from_millis(10));
@@ -104,7 +104,7 @@ impl TuiView {
         }
     }
 
-    fn tick(&mut self, mut model: AppModel) -> Result<AppModel, TuiError> {
+    fn tick(&mut self, mut model: AppModel) -> AppModel {
         self.toast.tick();
         let cmd = TimerUpdate::tick(
             self.should_auto_next(model.timer.state(), &model.settings.pomodoro.timer),
@@ -112,7 +112,7 @@ impl TuiView {
         );
 
         model = self.handle_timer_cmd(cmd, model);
-        Ok(model)
+        model
     }
 
     fn handle_timer_cmd(&mut self, cmd: TimerCmd, mut model: AppModel) -> AppModel {
@@ -195,14 +195,14 @@ impl TuiView {
     ) -> Result<AppModel, TuiError> {
         // Handle settings input directly on the renderer
         match self.router.active_page() {
-            Some(Page::Settings) => model = self.handle_settings(input, model)?,
-            Some(Page::Timer) => model = self.handle_timer(input, model)?,
+            Some(Page::Settings) => model = self.handle_settings(input, model),
+            Some(Page::Timer) => model = self.handle_timer(input, model),
             None => self.quit(),
         }
         Ok(model)
     }
 
-    fn handle_timer(&mut self, event: Event, mut model: AppModel) -> Result<AppModel, TuiError> {
+    fn handle_timer(&mut self, event: Event, mut model: AppModel) -> AppModel {
         use KeyCode as K;
         use TimerMsg::*;
 
@@ -242,14 +242,10 @@ impl TuiView {
                 _ => {}
             }
         }
-        Ok(model)
+        model
     }
 
-    fn handle_timer_nextstate_prompt(
-        &mut self,
-        event: Event,
-        mut model: AppModel,
-    ) -> Result<AppModel, TuiError> {
+    fn handle_timer_nextstate_prompt(&mut self, event: Event, mut model: AppModel) -> AppModel {
         if let Event::Key(key) = event {
             match key.code {
                 KeyCode::Enter | KeyCode::Char('y') => {
@@ -260,11 +256,11 @@ impl TuiView {
                 _ => {}
             }
         }
-        Ok(model)
+        model
     }
 
     /// Handle settings page input directly, mutating renderer state
-    fn handle_settings(&mut self, event: Event, mut model: AppModel) -> Result<AppModel, TuiError> {
+    fn handle_settings(&mut self, event: Event, mut model: AppModel) -> AppModel {
         let settings = &mut self.renderer.settings;
 
         // When editing, handle text input
@@ -300,14 +296,10 @@ impl TuiView {
             _ => {}
         }
 
-        Ok(model)
+        model
     }
 
-    fn handle_settings_edit(
-        &mut self,
-        event: Event,
-        mut model: AppModel,
-    ) -> Result<AppModel, TuiError> {
+    fn handle_settings_edit(&mut self, event: Event, mut model: AppModel) -> AppModel {
         let settings = &mut self.renderer.settings;
 
         if let Event::Key(key) = event
@@ -325,8 +317,7 @@ impl TuiView {
                 _ => {}
             }
         }
-
-        Ok(model)
+        model
     }
 
     fn update_settings(&mut self, mut model: AppModel) -> AppModel {
