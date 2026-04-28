@@ -15,7 +15,7 @@ use ratatui::prelude::*;
 use crate::config::Config;
 use crate::config::Percentage;
 use crate::models::Pomodoro;
-use crate::models::pomodoro::PomodoroState;
+use crate::models::pomodoro::State;
 use crate::services::SoundService;
 use crate::services::cmd_runner::run_cmds;
 use crate::services::notify::notify;
@@ -33,7 +33,7 @@ use crate::ui::tui::TuiError;
 use crate::ui::tui::input::Input;
 use crate::ui::tui::renderer::TuiRenderer;
 
-type Sound = Box<dyn SoundService<SoundType = PomodoroState>>;
+type Sound = Box<dyn SoundService<SoundType = State>>;
 
 pub struct TuiView {
     router: Router,
@@ -180,9 +180,9 @@ impl TuiView {
     fn should_auto_next(&self) -> bool {
         let timer = &self.config.pomodoro.timer;
         match self.pomodoro.state() {
-            PomodoroState::Focus => timer.auto_focus,
-            PomodoroState::LongBreak => timer.auto_long,
-            PomodoroState::ShortBreak => timer.auto_short,
+            State::Focus => timer.auto_focus,
+            State::LongBreak => timer.auto_long,
+            State::ShortBreak => timer.auto_short,
         }
     }
 

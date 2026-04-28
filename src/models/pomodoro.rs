@@ -1,7 +1,7 @@
 use std::time::Duration;
 use std::time::Instant;
 
-use PomodoroState::*;
+use State::*;
 
 #[derive(Clone, Debug)]
 pub struct Pomodoro {
@@ -20,7 +20,7 @@ pub struct Pomodoro {
 
     // Session data
     running: bool,
-    state: PomodoroState,
+    state: State,
 
     /// Anchor instant for the current running segment.
     /// Always set when running, None when paused.
@@ -117,7 +117,7 @@ impl Pomodoro {
         self.reset_time();
     }
 
-    pub fn state(&self) -> PomodoroState {
+    pub fn state(&self) -> State {
         self.state
     }
 
@@ -172,7 +172,7 @@ impl Pomodoro {
     }
 
     /// Gets the next state after this state.
-    pub fn next_state(&self) -> PomodoroState {
+    pub fn next_state(&self) -> State {
         match self.state {
             Focus => {
                 if (self.focus_sessions + 1).is_multiple_of(self.long_interval) {
@@ -217,7 +217,7 @@ impl Pomodoro {
 impl Default for Pomodoro {
     fn default() -> Self {
         Self {
-            state: PomodoroState::Focus,
+            state: State::Focus,
             focus: Duration::from_mins(25),
             long_break: Duration::from_mins(15),
             short_break: Duration::from_mins(5),
@@ -233,13 +233,13 @@ impl Default for Pomodoro {
 }
 
 #[derive(Clone, Debug, Copy, PartialEq, Eq, Hash)]
-pub enum PomodoroState {
+pub enum State {
     Focus,
     LongBreak,
     ShortBreak,
 }
 
-impl std::fmt::Display for PomodoroState {
+impl std::fmt::Display for State {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Focus => write!(f, "Focus"),

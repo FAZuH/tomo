@@ -9,7 +9,7 @@ use ratatui::widgets::Paragraph;
 use tui_widgets::popup::Popup;
 
 use crate::models::Pomodoro;
-use crate::models::pomodoro::PomodoroState;
+use crate::models::pomodoro::State;
 use crate::utils;
 
 pub struct TuiTimerRenderer {
@@ -17,7 +17,7 @@ pub struct TuiTimerRenderer {
     layout: Layout,
     paused_p: Paragraph<'static>,
     paused_width: u16,
-    state_labels: HashMap<PomodoroState, (String, u16)>,
+    state_labels: HashMap<State, (String, u16)>,
 }
 
 impl TuiTimerRenderer {
@@ -34,9 +34,9 @@ impl TuiTimerRenderer {
         // Pre-compute state labels
         let mut state_labels = HashMap::new();
         for (state, text) in [
-            (PomodoroState::Focus, "FOCUS"),
-            (PomodoroState::ShortBreak, "SHORT BREAK"),
-            (PomodoroState::LongBreak, "LONG BREAK"),
+            (State::Focus, "FOCUS"),
+            (State::ShortBreak, "SHORT BREAK"),
+            (State::LongBreak, "LONG BREAK"),
         ] {
             let label = utils::ascii_future(text);
             let width = utils::string_width(&label) as u16;
@@ -129,12 +129,12 @@ impl TuiTimerRenderer {
         }
     }
 
-    fn state(&self, frame: &mut Frame, area: Rect, state: PomodoroState, paused: bool) {
+    fn state(&self, frame: &mut Frame, area: Rect, state: State, paused: bool) {
         let (label, label_width) = &self.state_labels[&state];
         let color = match state {
-            PomodoroState::Focus => Color::LightRed,
-            PomodoroState::ShortBreak => Color::LightGreen,
-            PomodoroState::LongBreak => Color::LightCyan,
+            State::Focus => Color::LightRed,
+            State::ShortBreak => Color::LightGreen,
+            State::LongBreak => Color::LightCyan,
         };
         let center = Alignment::Center;
 
@@ -253,10 +253,10 @@ fn format_duration_clock(d: &Duration) -> String {
     format!("{:02}:{:02}", secs / 60, secs % 60)
 }
 
-fn session_color(state: PomodoroState) -> Color {
+fn session_color(state: State) -> Color {
     match state {
-        PomodoroState::Focus => Color::LightBlue,
-        PomodoroState::ShortBreak => Color::LightGreen,
-        PomodoroState::LongBreak => Color::LightCyan,
+        State::Focus => Color::LightBlue,
+        State::ShortBreak => Color::LightGreen,
+        State::LongBreak => Color::LightCyan,
     }
 }

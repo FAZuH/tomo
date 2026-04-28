@@ -8,7 +8,7 @@ use rodio::Player;
 
 use crate::config::pomodoro::Alarm;
 use crate::config::pomodoro::Alarms;
-use crate::models::pomodoro::PomodoroState;
+use crate::models::pomodoro::State;
 use crate::services::SoundError;
 use crate::services::SoundService;
 
@@ -16,7 +16,7 @@ pub struct AlarmService {
     focus: Alarm,
     long: Alarm,
     short: Alarm,
-    state: Option<PomodoroState>,
+    state: Option<State>,
 
     sound_thread: Option<JoinHandle<()>>,
 }
@@ -32,7 +32,7 @@ impl AlarmService {
         }
     }
 
-    pub fn set_state(&mut self, state: PomodoroState) {
+    pub fn set_state(&mut self, state: State) {
         self.state = Some(state);
     }
 
@@ -44,7 +44,7 @@ impl AlarmService {
 }
 
 impl SoundService for AlarmService {
-    type SoundType = PomodoroState;
+    type SoundType = State;
 
     fn play(&mut self) -> Result<(), SoundError> {
         let state = match self.state {
@@ -53,9 +53,9 @@ impl SoundService for AlarmService {
         };
 
         let alarm = match state {
-            PomodoroState::Focus => &self.focus,
-            PomodoroState::LongBreak => &self.long,
-            PomodoroState::ShortBreak => &self.short,
+            State::Focus => &self.focus,
+            State::LongBreak => &self.long,
+            State::ShortBreak => &self.short,
         };
         if let Some(path) = &alarm.path
             && let Ok(file) = File::open(path)
