@@ -16,8 +16,6 @@ use tui_widgets::prompts::Status;
 
 use crate::config::Config;
 use crate::config::Percentage;
-use crate::config::pomodoro::Hooks;
-use crate::config::pomodoro::Timers;
 use crate::models::pomodoro::State;
 use crate::services::SoundService;
 use crate::services::cmd_runner::run_cmds;
@@ -42,6 +40,8 @@ use crate::ui::update::timer::TimerUpdate;
 type Sound = Box<dyn SoundService<SoundType = State>>;
 
 pub struct TuiView {
+    model: AppModel,
+
     router: Router,
     latest_config_save: Option<Config>,
 
@@ -54,19 +54,18 @@ pub struct TuiView {
 }
 
 impl View for TuiView {
-    type Model = AppModel;
-
-    fn run(&mut self, model: Self::Model) -> Result<(), UiError> {
-        Ok(self.run_loop(model)?)
+    fn run(&mut self) -> Result<(), UiError> {
+        Ok(self.run_loop()?)
     }
 }
 
 impl TuiView {
-    pub fn new(sound: Sound) -> Result<Self, TuiError> {
+    pub fn new(model: AppModel, sound: Sound) -> Result<Self, TuiError> {
         let renderer = TuiRenderer::new();
         let terminal = Tui::new()?;
 
         Ok(Self {
+            model,
             router: Router::new(Page::Timer),
             latest_config_save: None,
             renderer,
@@ -77,20 +76,20 @@ impl TuiView {
         })
     }
 
-    fn run_loop(&mut self, mut model: AppModel) -> Result<(), TuiError> {
-        self.snapshot_settings(&model);
+    fn run_loop(&mut self) -> Result<(), TuiError> {
+        self.snapshot_settings();
 
         while !self.router.is_quit() {
             let mut redraw = self.tick.new_tick();
 
             if let Some(input) = Self::get_input()? {
-                model = self.handle_key_event(input, model)?;
+                self.handle_key_event(input)?;
                 redraw = true;
             }
 
             if redraw {
-                model = self.tick(model);
-                self.render_terminal(&model)?;
+                self.tick();
+                self.render_terminal()?;
             }
             sleep(Duration::from_millis(10));
         }
@@ -105,55 +104,50 @@ impl TuiView {
         }
     }
 
-    fn tick(&mut self, mut model: AppModel) -> AppModel {
+    fn tick(&mut self) {
         self.toast.tick();
-        let cmd = TimerUpdate::tick(
-            self.should_auto_next(model.timer.state(), &model.settings.pomodoro.timer),
-            &model.timer,
-        );
+        let cmd = TimerUpdate::tick(self.should_auto_next(), &self.model.timer);
 
-        model = self.handle_timer_cmd(cmd, model);
-        model
+        self.handle_timer_cmd(cmd);
     }
 
-    fn handle_timer_cmd(&mut self, cmd: TimerCmd, mut model: AppModel) -> AppModel {
+    fn handle_timer_cmd(&mut self, cmd: TimerCmd) {
         match cmd {
             TimerCmd::None => {}
             TimerCmd::PromptNextSession => {
                 if !self.renderer.timer.prompt_next_session() {
                     // only runs on once per session
-                    self.on_session_end(&model);
+                    self.on_session_end();
                 }
                 self.renderer.timer.set_prompt_next_session(true);
             }
             TimerCmd::NextSession => {
-                self.on_session_end(&model);
-                model = self.next_session(model);
+                self.on_session_end();
+                self.next_session();
             }
             TimerCmd::SessionContinued => {}
         }
-        model
     }
 
-    fn on_session_end(&mut self, model: &AppModel) {
-        self.run_hooks(&model.settings.pomodoro.hook, model.timer.state());
-        self.play_sound(model.timer.next_state());
-        self.send_notification(model.timer.next_state());
+    fn on_session_end(&mut self) {
+        self.run_hooks();
+        self.play_sound();
+        self.send_notification();
     }
 
-    fn run_hooks(&self, conf: &Hooks, curr_state: State) {
-        run_cmds(conf, curr_state);
+    fn run_hooks(&self) {
+        run_cmds(&self.model.settings.pomodoro.hook, self.model.timer.state());
     }
 
-    fn send_notification(&mut self, next_state: State) {
-        if let Err(e) = notify(next_state) {
+    fn send_notification(&mut self) {
+        if let Err(e) = notify(self.model.timer.next_state()) {
             self.show_toast(e.to_string(), ToastType::Error);
         }
     }
 
-    fn play_sound(&mut self, next_state: State) {
+    fn play_sound(&mut self) {
         if !self.sound.is_playing() {
-            self.sound.set_sound(next_state);
+            self.sound.set_sound(self.model.timer.next_state());
             if let Err(e) = self.sound.play() {
                 self.show_toast(e.to_string(), ToastType::Error);
             }
@@ -165,108 +159,100 @@ impl TuiView {
             .show_toast(ToastBuilder::new(message.into()).toast_type(r#type));
     }
 
-    fn next_session(&mut self, mut model: AppModel) -> AppModel {
-        (model.timer, _) = TimerUpdate::update(TimerMsg::NextState, model.timer);
-        model
+    fn next_session(&mut self) {
+        TimerUpdate::update(TimerMsg::NextState, &mut self.model.timer);
     }
 
-    fn should_auto_next(&self, curr_state: State, timer: &Timers) -> bool {
-        match curr_state {
+    fn should_auto_next(&self) -> bool {
+        let timer = &self.model.settings.pomodoro.timer;
+        match self.model.timer.state() {
             State::Focus => timer.auto_focus,
             State::LongBreak => timer.auto_long,
             State::ShortBreak => timer.auto_short,
         }
     }
 
-    fn render_terminal(&mut self, model: &AppModel) -> Result<(), TuiError> {
+    fn render_terminal(&mut self) -> Result<(), TuiError> {
         self.terminal.draw(|f| {
             let area = f.area();
             self.renderer
-                .flush(f, &self.router, &model.timer, &model.settings);
+                .flush(f, &self.router, &self.model.timer, &self.model.settings);
             self.toast.set_area(area);
             self.toast.render(area, f.buffer_mut());
         })?;
         Ok(())
     }
 
-    fn handle_key_event(
-        &mut self,
-        input: Event,
-        mut model: AppModel,
-    ) -> Result<AppModel, TuiError> {
+    fn handle_key_event(&mut self, input: Event) -> Result<(), TuiError> {
         // Handle settings input directly on the renderer
         match self.router.active_page() {
-            Some(Page::Settings) => model = self.handle_settings(input, model),
-            Some(Page::Timer) => model = self.handle_timer(input, model),
+            Some(Page::Settings) => self.handle_settings(input),
+            Some(Page::Timer) => self.handle_timer(input),
             None => self.quit(),
         }
-        Ok(model)
+        Ok(())
     }
 
-    fn handle_timer(&mut self, event: Event, mut model: AppModel) -> AppModel {
+    fn handle_timer(&mut self, event: Event) {
         use KeyCode as K;
         use TimerMsg::*;
 
+        let model = &mut self.model;
+
         if self.renderer.timer.prompt_next_session() {
-            return self.handle_timer_nextstate_prompt(event, model);
+            return self.handle_timer_nextstate_prompt(event);
         }
 
         if let Event::Key(key) = event {
             match key.code {
                 K::Left | K::Char('h') => {
-                    (model.timer, _) =
-                        TimerUpdate::update(Subtract(Duration::from_secs(30)), model.timer);
+                    TimerUpdate::update(Subtract(Duration::from_secs(30)), &mut model.timer);
                 }
                 K::Down | K::Char('j') => {
-                    (model.timer, _) =
-                        TimerUpdate::update(Subtract(Duration::from_secs(60)), model.timer);
+                    TimerUpdate::update(Subtract(Duration::from_secs(60)), &mut model.timer);
                 }
                 K::Right | K::Char('l') => {
-                    (model.timer, _) =
-                        TimerUpdate::update(Add(Duration::from_secs(30)), model.timer);
+                    TimerUpdate::update(Add(Duration::from_secs(30)), &mut model.timer);
                 }
                 K::Up | K::Char('k') => {
-                    (model.timer, _) =
-                        TimerUpdate::update(Add(Duration::from_secs(60)), model.timer);
+                    TimerUpdate::update(Add(Duration::from_secs(60)), &mut model.timer);
                 }
                 K::Char(' ') => {
-                    (model.timer, _) = TimerUpdate::update(TogglePause, model.timer);
+                    TimerUpdate::update(TogglePause, &mut model.timer);
                 }
                 K::Enter => {
-                    (model.timer, _) = TimerUpdate::update(SkipSession, model.timer);
+                    TimerUpdate::update(SkipSession, &mut model.timer);
                 }
                 K::Backspace => {
-                    (model.timer, _) = TimerUpdate::update(ResetSession, model.timer);
+                    TimerUpdate::update(ResetSession, &mut model.timer);
                 }
                 K::Char('q') => self.quit(),
                 K::Char('s') => self.router.navigate(Page::Settings),
                 _ => {}
             }
         }
-        model
     }
 
-    fn handle_timer_nextstate_prompt(&mut self, event: Event, mut model: AppModel) -> AppModel {
+    fn handle_timer_nextstate_prompt(&mut self, event: Event) {
         if let Event::Key(key) = event {
             match key.code {
                 KeyCode::Enter | KeyCode::Char('y') => {
-                    model = self.next_session(model);
+                    self.next_session();
                     self.renderer.timer.set_prompt_next_session(false);
                 }
                 KeyCode::Esc | KeyCode::Char('n') => self.quit(),
                 _ => {}
             }
         }
-        model
     }
 
     /// Handle settings page input directly, mutating renderer state
-    fn handle_settings(&mut self, event: Event, mut model: AppModel) -> AppModel {
+    fn handle_settings(&mut self, event: Event) {
         let settings = &mut self.renderer.settings;
 
         // When editing, handle text input
         if settings.is_editing() {
-            return self.handle_settings_edit(event, model);
+            return self.handle_settings_edit(event);
         }
 
         // When navigating, handle navigation input
@@ -276,14 +262,14 @@ impl TuiView {
                 KeyCode::Down | KeyCode::Char('j') => settings.select_down(),
                 KeyCode::Enter => {
                     if SettingsMsg::is_toggle_index(settings.selected_idx()) {
-                        model = self.update_settings(model)
+                        self.update_settings()
                     } else {
-                        settings.start_editing_for_field(&model.settings.pomodoro)
+                        settings.start_editing_for_field(&self.model.settings.pomodoro)
                     }
                 }
-                KeyCode::Char('s') => self.save_settings(&model),
+                KeyCode::Char('s') => self.save_settings(),
                 KeyCode::Char(' ') if SettingsMsg::is_toggle_index(settings.selected_idx()) => {
-                    model = self.update_settings(model)
+                    self.update_settings()
                 }
                 KeyCode::Esc => self.router.navigate(Page::Timer),
                 KeyCode::Char('q') => self.quit(),
@@ -296,11 +282,9 @@ impl TuiView {
             },
             _ => {}
         }
-
-        model
     }
 
-    fn handle_settings_edit(&mut self, event: Event, mut model: AppModel) -> AppModel {
+    fn handle_settings_edit(&mut self, event: Event) {
         let settings = &mut self.renderer.settings;
 
         if let Event::Key(key) = event
@@ -310,7 +294,7 @@ impl TuiView {
 
             match prompt.text_state.status() {
                 Status::Done => {
-                    model = self.update_settings(model);
+                    self.update_settings();
                 }
                 Status::Aborted => {
                     settings.cancel_editing();
@@ -318,10 +302,9 @@ impl TuiView {
                 _ => {}
             }
         }
-        model
     }
 
-    fn update_settings(&mut self, mut model: AppModel) -> AppModel {
+    fn update_settings(&mut self) {
         let settings = &mut self.renderer.settings;
         let selected_idx = settings.selected_idx();
         let value = settings.take_edit_value();
@@ -329,15 +312,14 @@ impl TuiView {
 
         let msg = match self.msg_from_edit(value, selected_idx) {
             Some(msg) => msg,
-            None => return model,
+            None => return,
         };
 
-        (model.settings, _) = SettingsUpdate::update(msg, model.settings);
+        SettingsUpdate::update(msg, &mut self.model.settings);
 
         self.renderer
             .settings
-            .set_has_unsaved_changes(self.check_settings_updated(&model));
-        model
+            .set_has_unsaved_changes(self.check_settings_updated());
     }
 
     fn msg_from_edit(&mut self, value: String, selected_idx: u32) -> Option<SettingsMsg> {
@@ -368,11 +350,11 @@ impl TuiView {
         Some(msg)
     }
 
-    fn save_settings(&mut self, model: &AppModel) {
-        match model.settings.save() {
+    fn save_settings(&mut self) {
+        match self.model.settings.save() {
             Ok(()) => {
                 self.renderer.settings.set_has_unsaved_changes(false);
-                self.snapshot_settings(model);
+                self.snapshot_settings();
                 self.show_toast("Settings saved!", ToastType::Success);
             }
             Err(e) => {
@@ -382,9 +364,9 @@ impl TuiView {
     }
 
     /// Compare current config with when it was latest saved.
-    fn check_settings_updated(&self, model: &AppModel) -> bool {
+    fn check_settings_updated(&self) -> bool {
         if let Some(last) = &self.latest_config_save {
-            return model.settings != *last;
+            return self.model.settings != *last;
         }
         true
     }
@@ -392,8 +374,8 @@ impl TuiView {
     /// Snapshot current settings.
     ///
     /// Use with [`Self::check_settings_updated`]
-    fn snapshot_settings(&mut self, model: &AppModel) {
-        self.latest_config_save = Some(model.settings.clone())
+    fn snapshot_settings(&mut self) {
+        self.latest_config_save = Some(self.model.settings.clone())
     }
 
     fn quit(&mut self) {

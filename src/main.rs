@@ -23,15 +23,15 @@ async fn main() -> Result<(), AppError> {
         settings: conf,
     };
 
-    let mut view = view(&model);
-    view.run(model).unwrap();
+    let mut view = view(model);
+    view.run().unwrap();
 
     Ok(())
 }
 
-fn view<'b>(model: &AppModel) -> impl View<Model = AppModel> + 'b {
+fn view<'b>(model: AppModel) -> impl View + 'b {
     let sound = Box::new(AlarmService::new(model.settings.pomodoro.alarm.clone()));
-    TuiView::new(sound).unwrap()
+    TuiView::new(model, sound).unwrap()
 }
 
 fn pomodoro(cli: &Cli, conf: &Config) -> Pomodoro {

@@ -20,7 +20,5 @@ pub struct AppModel {
 }
 
 pub trait View {
-    type Model;
-
-    fn run(&mut self, model: Self::Model) -> Result<(), UiError>;
+    fn run(&mut self) -> Result<(), UiError>;
 }

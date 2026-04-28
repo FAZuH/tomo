@@ -47,7 +47,7 @@ impl Update for TimerUpdate {
     type Model = Pomodoro;
     type Cmd = TimerCmd;
 
-    fn update(msg: Self::Msg, mut model: Self::Model) -> (Self::Model, Self::Cmd) {
+    fn update(msg: Self::Msg, model: &mut Self::Model) -> Self::Cmd {
         use TimerMsg::*;
         let mut cmd = TimerCmd::None;
         match msg {
@@ -60,8 +60,8 @@ impl Update for TimerUpdate {
                 model.skip();
                 cmd = TimerCmd::SessionContinued;
             }
-            Tick { auto_next } => cmd = Self::tick(auto_next, &model),
+            Tick { auto_next } => cmd = Self::tick(auto_next, model),
         }
-        (model, cmd)
+        cmd
     }
 }

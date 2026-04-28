@@ -56,7 +56,7 @@ impl Update for SettingsUpdate {
     type Model = Config;
     type Cmd = SettingsCmd;
 
-    fn update(msg: Self::Msg, mut model: Self::Model) -> (Self::Model, Self::Cmd) {
+    fn update(msg: Self::Msg, model: &mut Self::Model) -> Self::Cmd {
         use SettingsMsg::*;
         let timer = &mut model.pomodoro.timer;
         let hook = &mut model.pomodoro.hook;
@@ -83,6 +83,6 @@ impl Update for SettingsUpdate {
             AlarmVolumeShort(v) => alarm.short.volume = v,
             AlarmVolumeLong(v) => alarm.long.volume = v,
         }
-        (model, cmd)
+        cmd
     }
 }
