@@ -22,11 +22,11 @@ pub struct AlarmService {
 }
 
 impl AlarmService {
-    pub fn new(conf: &Alarms) -> Self {
+    pub fn new(conf: Alarms) -> Self {
         Self {
-            focus: conf.focus.clone(),
-            long: conf.long.clone(),
-            short: conf.short.clone(),
+            focus: conf.focus,
+            long: conf.long,
+            short: conf.short,
             state: None,
             sound_thread: None,
         }

@@ -10,7 +10,7 @@ use tui_widgets::scrollview::ScrollbarVisibility;
 
 use crate::config::Config;
 use crate::config::pomodoro::Alarm;
-use crate::ui::pages::settings::SETTINGS_VIEW_ITEMS;
+use crate::ui::update::settings::SETTINGS_VIEW_ITEMS;
 
 pub struct TuiSettingsRenderer {
     scroll_state: ScrollViewState,
