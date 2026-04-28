@@ -40,8 +40,8 @@ pub struct TuiView {
     latest_config_save: Option<Config>,
     renderer: TuiRenderer,
     terminal: Tui,
-    needs_redraw: bool,
     sound: Sound,
+    tick: TickHandler,
 }
 
 impl View for TuiView {
@@ -62,32 +62,25 @@ impl TuiView {
             latest_config_save: None,
             renderer,
             terminal,
-            needs_redraw: true,
             sound,
+            tick: TickHandler::default(),
         })
     }
 
     fn run_loop(&mut self, mut model: AppModel) -> Result<(), TuiError> {
-        let mut last_tick = Instant::now();
-        let tick_rate = Duration::from_millis(1000);
-
         self.snapshot_settings(&model);
 
         while !self.router.is_quit() {
-            let now = Instant::now();
-            if now.duration_since(last_tick) >= tick_rate {
-                last_tick = now;
-                self.needs_redraw = true;
-            }
-
-            if self.needs_redraw {
-                model = self.tick(model)?;
-                self.needs_redraw = false;
-            }
+            let mut redraw = self.tick.new_tick();
 
             if let Some(input) = Self::get_input()? {
                 model = self.handle_key_event(input, model)?;
-                self.needs_redraw = true;
+                redraw = true;
+            }
+
+            if redraw {
+                model = self.tick(model)?;
+                self.render_terminal(&model)?;
             }
             sleep(Duration::from_millis(10));
         }
@@ -103,15 +96,10 @@ impl TuiView {
     }
 
     fn tick(&mut self, mut model: AppModel) -> Result<AppModel, TuiError> {
-        self.render_terminal(&model)?;
-        let (timer, cmd) = TimerUpdate::update(
-            TimerMsg::Tick {
-                auto_next: self
-                    .should_auto_next(model.timer.state(), &model.settings.pomodoro.timer),
-            },
-            model.timer,
+        let cmd = TimerUpdate::tick(
+            self.should_auto_next(model.timer.state(), &model.settings.pomodoro.timer),
+            &model.timer,
         );
-        model.timer = timer;
 
         model = self.handle_timer_cmd(cmd, model);
         Ok(model)
@@ -408,5 +396,35 @@ fn parse_volume(s: &str) -> Percentage {
         Percentage::default()
     } else {
         Percentage::try_from(s).unwrap_or_default()
+    }
+}
+
+struct TickHandler {
+    last_tick: Option<Instant>,
+    tick_rate: Duration,
+}
+
+impl TickHandler {
+    fn new_tick(&mut self) -> bool {
+        match self.last_tick {
+            Some(last) => {
+                let now = Instant::now();
+                let new_tick = now.duration_since(last) >= self.tick_rate;
+                if new_tick {
+                    self.last_tick = Some(now);
+                }
+                new_tick
+            }
+            None => true,
+        }
+    }
+}
+
+impl Default for TickHandler {
+    fn default() -> Self {
+        Self {
+            last_tick: None,
+            tick_rate: Duration::from_secs(1),
+        }
     }
 }

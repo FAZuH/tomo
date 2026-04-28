@@ -28,6 +28,18 @@ impl TimerUpdate {
     pub fn new() -> Self {
         Self {}
     }
+
+    pub fn tick(auto_next: bool, model: &Pomodoro) -> TimerCmd {
+        if model.remaining_time().is_zero() {
+            if auto_next {
+                TimerCmd::NextSession
+            } else {
+                TimerCmd::PromptNextSession
+            }
+        } else {
+            TimerCmd::None
+        }
+    }
 }
 
 impl Update for TimerUpdate {
@@ -48,15 +60,7 @@ impl Update for TimerUpdate {
                 model.skip();
                 cmd = TimerCmd::SessionContinued;
             }
-            Tick { auto_next } => {
-                if model.remaining_time().is_zero() {
-                    if auto_next {
-                        cmd = TimerCmd::NextSession;
-                    } else {
-                        cmd = TimerCmd::PromptNextSession;
-                    }
-                }
-            }
+            Tick { auto_next } => cmd = Self::tick(auto_next, &model),
         }
         (model, cmd)
     }
