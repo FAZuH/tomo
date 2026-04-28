@@ -4,13 +4,7 @@ use std::time::Instant;
 
 use crossterm::event::Event;
 use crossterm::event::{self};
-use crossterm::execute;
-use crossterm::terminal::EnterAlternateScreen;
-use crossterm::terminal::LeaveAlternateScreen;
-use crossterm::terminal::disable_raw_mode;
-use crossterm::terminal::enable_raw_mode;
 use log::error;
-use ratatui::prelude::*;
 
 use crate::config::Config;
 use crate::config::Percentage;
@@ -27,6 +21,7 @@ use crate::ui::router::Navigation;
 use crate::ui::router::Page;
 use crate::ui::router::Router;
 use crate::ui::tui::TuiError;
+use crate::ui::tui::backend::Tui;
 use crate::ui::tui::input::Input;
 use crate::ui::tui::renderer::TuiRenderer;
 use crate::ui::update::settings::SettingsMsg;
@@ -42,7 +37,7 @@ pub struct TuiView {
     latest_config_save: Option<Config>,
     should_quit: bool,
     renderer: TuiRenderer,
-    terminal: Terminal<CrosstermBackend<std::io::Stdout>>,
+    terminal: Tui,
     needs_redraw: bool,
     sound: Sound,
 }
@@ -51,21 +46,14 @@ impl View for TuiView {
     type Model = AppModel;
 
     fn run(&mut self, model: Self::Model) -> Result<(), UiError> {
-        enable_raw_mode().map_err(TuiError::from)?;
-        execute!(std::io::stdout(), EnterAlternateScreen).map_err(TuiError::from)?;
-
-        let res = self.run_loop(model);
-        self.cleanup();
-        res?;
-
-        Ok(())
+        Ok(self.run_loop(model)?)
     }
 }
 
 impl TuiView {
     pub fn new(sound: Sound) -> Result<Self, TuiError> {
         let renderer = TuiRenderer::new();
-        let terminal = Terminal::new(CrosstermBackend::new(std::io::stdout()))?;
+        let terminal = Tui::new()?;
 
         Ok(Self {
             router: Router::new(Page::Timer),
@@ -76,13 +64,6 @@ impl TuiView {
             needs_redraw: true,
             sound,
         })
-    }
-
-    fn cleanup(&mut self) {
-        // Unconditionally ignore errors for cleanup
-        let _ = disable_raw_mode();
-        let _ = execute!(self.terminal.backend_mut(), LeaveAlternateScreen);
-        let _ = self.terminal.show_cursor();
     }
 
     fn run_loop(&mut self, mut model: AppModel) -> Result<(), TuiError> {
@@ -111,10 +92,11 @@ impl TuiView {
     }
 
     fn get_input() -> Result<Option<Input>, TuiError> {
-        if event::poll(Duration::from_millis(10))?
-            && let Event::Key(key) = event::read()?
-        {
-            Ok(Input::from_keyevent(key))
+        if event::poll(Duration::from_millis(10))? {
+            match event::read()? {
+                Event::Key(key) => Ok(Input::from_keyevent(key)),
+                _ => Ok(None),
+            }
         } else {
             Ok(None)
         }
