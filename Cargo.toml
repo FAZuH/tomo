@@ -39,6 +39,3 @@ tui-widgets = "0.7.2"
 [[bin]]
 path = "src/main.rs"
 name = "tomo"
-
-[workspace]
-members = ["crates/ratatui-toaster"]
