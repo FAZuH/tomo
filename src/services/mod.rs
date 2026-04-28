@@ -1,6 +1,6 @@
+pub mod alarm;
 pub mod cmd_runner;
 pub mod notify;
-pub mod sound;
 pub mod traits;
 
 use rodio::DeviceSinkError;

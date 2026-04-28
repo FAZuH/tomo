@@ -1,7 +1,7 @@
 use tomo::config::Config;
 use tomo::log::setup_logging;
 use tomo::services::SoundService;
-use tomo::services::sound::AlarmService;
+use tomo::services::alarm::AlarmService;
 
 fn main() {
     let conf = Config::load().unwrap();
