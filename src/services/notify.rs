@@ -1,5 +1,4 @@
 use notify_rust::Notification;
-use notify_rust::NotificationHandle;
 use notify_rust::{self};
 
 use crate::models::pomodoro::State;
@@ -18,8 +17,7 @@ impl From<State> for Notification {
     }
 }
 
-pub fn notify(
-    notifiable: impl Into<Notification>,
-) -> Result<NotificationHandle, notify_rust::error::Error> {
-    notifiable.into().show()
+pub fn notify(notifiable: impl Into<Notification>) -> Result<(), notify_rust::error::Error> {
+    notifiable.into().show()?;
+    Ok(())
 }
