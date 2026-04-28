@@ -38,7 +38,6 @@ type Sound = Box<dyn SoundService<SoundType = State>>;
 pub struct TuiView {
     router: Router,
     latest_config_save: Option<Config>,
-    should_quit: bool,
     renderer: TuiRenderer,
     terminal: Tui,
     needs_redraw: bool,
@@ -61,7 +60,6 @@ impl TuiView {
         Ok(Self {
             router: Router::new(Page::Timer),
             latest_config_save: None,
-            should_quit: false,
             renderer,
             terminal,
             needs_redraw: true,
@@ -75,7 +73,7 @@ impl TuiView {
 
         self.snapshot_settings(&model);
 
-        while !self.should_quit {
+        while !self.router.is_quit() {
             let now = Instant::now();
             if now.duration_since(last_tick) >= tick_rate {
                 last_tick = now;
@@ -194,7 +192,7 @@ impl TuiView {
         match self.router.active_page() {
             Some(Page::Settings) => model = self.handle_settings(input, model)?,
             Some(Page::Timer) => model = self.handle_timer(input, model)?,
-            None => self.should_quit = true,
+            None => self.quit(),
         }
         Ok(model)
     }
@@ -235,7 +233,7 @@ impl TuiView {
                     (model.timer, _) = TimerUpdate::update(ResetSession, model.timer);
                 }
                 K::Char('q') => self.quit(),
-                K::Char('s') => self.router.navigate(Navigation::GoTo(Page::Settings)),
+                K::Char('s') => self.router.navigate(Page::Settings),
                 _ => {}
             }
         }
@@ -285,7 +283,7 @@ impl TuiView {
                 KeyCode::Char(' ') if SettingsMsg::is_toggle_index(settings.selected_idx()) => {
                     model = self.update_settings(model)
                 }
-                KeyCode::Esc => self.router.navigate(Navigation::GoTo(Page::Timer)),
+                KeyCode::Esc => self.router.navigate(Page::Timer),
                 KeyCode::Char('q') => self.quit(),
                 _ => {}
             },
@@ -387,7 +385,6 @@ impl TuiView {
 
     fn quit(&mut self) {
         self.router.navigate(Navigation::Quit);
-        self.should_quit = true
     }
 }
 
