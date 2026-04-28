@@ -3,111 +3,111 @@ use diesel::SqliteConnection;
 use diesel::r2d2::ConnectionManager;
 use diesel::r2d2::Pool;
 
-use crate::repo::ProjectRepository;
-use crate::repo::Repositories;
-use crate::repo::SessionRepository;
-use crate::repo::TagRepository;
-use crate::repo::TaskRepository;
+use crate::repo::ProjectRepo;
+use crate::repo::Repos;
+use crate::repo::SessionRepo;
+use crate::repo::TagRepo;
+use crate::repo::TaskRepo;
 use crate::repo::error::RepoError;
 
 type SqlitePool = Pool<ConnectionManager<SqliteConnection>>;
 
-pub struct SqliteRepositories {
-    db: SqliteDatabase,
-    project: SqliteProjectRepository,
-    tag: SqliteTagRepository,
-    task: SqliteTaskRepository,
-    session: SqliteSessionRepository,
+pub struct SqliteRepos {
+    db: SqliteDb,
+    project: SqliteProjectRepo,
+    tag: SqliteTagRepo,
+    task: SqliteTaskRepo,
+    session: SqliteSessionRepo,
 }
 
-impl SqliteRepositories {
-    pub fn new(db: SqliteDatabase) -> Self {
+impl SqliteRepos {
+    pub fn new(db: SqliteDb) -> Self {
         let pool = db.pool();
         Self {
             db,
-            project: SqliteProjectRepository::new(pool.clone()),
-            tag: SqliteTagRepository::new(pool.clone()),
-            task: SqliteTaskRepository::new(pool.clone()),
-            session: SqliteSessionRepository::new(pool.clone()),
+            project: SqliteProjectRepo::new(pool.clone()),
+            tag: SqliteTagRepo::new(pool.clone()),
+            task: SqliteTaskRepo::new(pool.clone()),
+            session: SqliteSessionRepo::new(pool.clone()),
         }
     }
 }
 
-impl Repositories for SqliteRepositories {
-    fn project(&self) -> impl ProjectRepository {
+impl Repos for SqliteRepos {
+    fn project(&self) -> impl ProjectRepo {
         self.project.clone()
     }
 
-    fn tag(&self) -> impl TagRepository {
+    fn tag(&self) -> impl TagRepo {
         self.tag.clone()
     }
 
-    fn task(&self) -> impl TaskRepository {
+    fn task(&self) -> impl TaskRepo {
         self.task.clone()
     }
 
-    fn session(&self) -> impl SessionRepository {
+    fn session(&self) -> impl SessionRepo {
         self.session.clone()
     }
 }
 
 #[derive(Clone)]
-pub struct SqliteProjectRepository {
+pub struct SqliteProjectRepo {
     pool: SqlitePool,
 }
 
-impl SqliteProjectRepository {
+impl SqliteProjectRepo {
     pub fn new(pool: SqlitePool) -> Self {
         Self { pool }
     }
 }
 
-impl ProjectRepository for SqliteProjectRepository {}
+impl ProjectRepo for SqliteProjectRepo {}
 
 #[derive(Clone)]
-pub struct SqliteTagRepository {
+pub struct SqliteTagRepo {
     pool: SqlitePool,
 }
 
-impl SqliteTagRepository {
+impl SqliteTagRepo {
     pub fn new(pool: SqlitePool) -> Self {
         Self { pool }
     }
 }
 
-impl TagRepository for SqliteTagRepository {}
+impl TagRepo for SqliteTagRepo {}
 
 #[derive(Clone)]
-pub struct SqliteTaskRepository {
+pub struct SqliteTaskRepo {
     pool: SqlitePool,
 }
 
-impl SqliteTaskRepository {
+impl SqliteTaskRepo {
     pub fn new(pool: SqlitePool) -> Self {
         Self { pool }
     }
 }
 
-impl TaskRepository for SqliteTaskRepository {}
+impl TaskRepo for SqliteTaskRepo {}
 
 #[derive(Clone)]
-pub struct SqliteSessionRepository {
+pub struct SqliteSessionRepo {
     pool: SqlitePool,
 }
 
-impl SessionRepository for SqliteSessionRepository {}
+impl SessionRepo for SqliteSessionRepo {}
 
-impl SqliteSessionRepository {
+impl SqliteSessionRepo {
     pub fn new(pool: SqlitePool) -> Self {
         Self { pool }
     }
 }
 
-pub struct SqliteDatabase {
+pub struct SqliteDb {
     pool: SqlitePool,
 }
 
-impl SqliteDatabase {
+impl SqliteDb {
     pub fn new(url: impl ToString) -> Result<Self, RepoError> {
         let manager = ConnectionManager::new(url.to_string());
         let pool = Pool::builder()

@@ -1,14 +1,14 @@
-pub trait ProjectRepository {}
+pub trait ProjectRepo {}
 
-pub trait TagRepository {}
+pub trait TagRepo {}
 
-pub trait TaskRepository {}
+pub trait TaskRepo {}
 
-pub trait SessionRepository {}
+pub trait SessionRepo {}
 
-pub trait Repositories {
-    fn project(&self) -> impl ProjectRepository;
-    fn tag(&self) -> impl TagRepository;
-    fn task(&self) -> impl TaskRepository;
-    fn session(&self) -> impl SessionRepository;
+pub trait Repos {
+    fn project(&self) -> impl ProjectRepo;
+    fn tag(&self) -> impl TagRepo;
+    fn task(&self) -> impl TaskRepo;
+    fn session(&self) -> impl SessionRepo;
 }
