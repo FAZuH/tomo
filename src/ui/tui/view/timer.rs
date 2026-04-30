@@ -268,7 +268,7 @@ static SHORTCUTS: LazyLock<Paragraph<'static>> = LazyLock::new(|| {
             Span::styled("Backspace", bright),
             Span::styled(": Reset", dim),
             sep.clone(),
-            Span::styled(" ", bright),
+            Span::styled("", bright),
             Span::styled(": ±30s", dim),
             sep.clone(),
             Span::styled("", bright),
@@ -278,6 +278,9 @@ static SHORTCUTS: LazyLock<Paragraph<'static>> = LazyLock::new(|| {
             Span::styled(": Quit", dim),
         ]),
         Line::from(vec![
+            Span::styled("s", bright),
+            Span::styled(": Settings", dim),
+            sep.clone(),
             Span::styled("?", bright),
             Span::styled(": Disable Help", dim),
         ]),
