@@ -1,9 +1,9 @@
 pub mod backend;
 pub mod renderer;
+pub mod runner;
 pub mod toasts;
-pub mod view;
 
-pub use view::TuiView;
+pub use runner::TuiRunner;
 
 #[derive(Debug, thiserror::Error)]
 pub enum TuiError {

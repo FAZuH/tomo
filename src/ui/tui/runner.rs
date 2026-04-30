@@ -29,7 +29,7 @@ use crate::ui::*;
 
 type Sound = Box<dyn SoundService<SoundType = State>>;
 
-pub struct TuiView {
+pub struct TuiRunner {
     model: AppModel,
 
     router: Router,
@@ -43,13 +43,13 @@ pub struct TuiView {
     toast: ToastHandler,
 }
 
-impl Runner for TuiView {
+impl Runner for TuiRunner {
     fn run(&mut self) -> Result<(), UiError> {
         Ok(self.run_loop()?)
     }
 }
 
-impl TuiView {
+impl TuiRunner {
     pub fn new(model: AppModel, sound: Sound) -> Result<Self, TuiError> {
         let renderer = TuiRenderer::new();
         let terminal = Tui::new()?;
