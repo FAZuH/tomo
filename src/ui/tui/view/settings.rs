@@ -3,6 +3,7 @@ use std::sync::LazyLock;
 
 use ratatui::layout::Flex;
 use ratatui::prelude::*;
+use ratatui::symbols::border;
 use ratatui::widgets::Block;
 use ratatui::widgets::Borders;
 use ratatui::widgets::Clear;
@@ -139,7 +140,12 @@ impl TuiSettingsView {
         sections
     }
 
-    fn build_timer_section(&self, m: &SettingsModel, conf: &Timers, sections: &mut Vec<Section>) {
+    fn build_timer_section(
+        &self,
+        model: &SettingsModel,
+        conf: &Timers,
+        sections: &mut Vec<Section>,
+    ) {
         use SettingsItem::*;
         // Build Pomodoro Timer section
         let label = "󰔛 Pomodoro Timer";
@@ -151,25 +157,25 @@ impl TuiSettingsView {
         }
         r.push(SectionRow::SubSectionHeader("Durations".into()));
         self.add_inpt(
-            m,
+            model,
             TimerFocus,
             format!("{}", conf.focus.as_secs() / 60),
             &mut r,
         );
         self.add_inpt(
-            m,
+            model,
             TimerShort,
             format!("{}", conf.short.as_secs() / 60),
             &mut r,
         );
         self.add_inpt(
-            m,
+            model,
             TimerLong,
             format!("{}", conf.long.as_secs() / 60),
             &mut r,
         );
         self.add_inpt(
-            m,
+            model,
             TimerLongInterval,
             format!("{}", conf.long_interval),
             &mut r,
@@ -180,14 +186,15 @@ impl TuiSettingsView {
             r.push(SectionRow::Blank);
         }
         r.push(SectionRow::SubSectionHeader("Auto Start".into()));
-        self.add_box(m, TimerAutoFocus, conf.auto_focus, &mut r);
-        self.add_box(m, TimerAutoShort, conf.auto_short, &mut r);
-        self.add_box(m, TimerAutoLong, conf.auto_long, &mut r);
+        self.add_box(model, TimerAutoFocus, conf.auto_focus, &mut r);
+        self.add_box(model, TimerAutoShort, conf.auto_short, &mut r);
+        self.add_box(model, TimerAutoLong, conf.auto_long, &mut r);
 
         let height = 2 + r.iter().map(|r| r.height()).sum::<u16>();
         sections.push(Section {
             title: label.into(),
-            color: SettingsSection::Timer,
+            section: SettingsSection::Timer,
+            sel_item: model.selected(),
             height,
             rows: r,
         });
@@ -216,7 +223,8 @@ impl TuiSettingsView {
         let height = 2 + r.iter().map(|r| r.height()).sum::<u16>();
         sections.push(Section {
             title: label.into(),
-            color: SettingsSection::Hook,
+            section: SettingsSection::Hook,
+            sel_item: model.selected(),
             height,
             rows: r,
         });
@@ -247,7 +255,8 @@ impl TuiSettingsView {
         let height = 2 + r.iter().map(|r| r.height()).sum::<u16>();
         sections.push(Section {
             title: "󰕾 Alarm".into(),
-            color: SettingsSection::Alarm,
+            section: SettingsSection::Alarm,
+            sel_item: model.selected(),
             height,
             rows: r,
         });
@@ -286,9 +295,20 @@ impl TuiSettingsView {
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct Section {
     title: String,
-    color: SettingsSection,
+    section: SettingsSection,
+    sel_item: SettingsItem,
     height: u16,
     rows: Vec<SectionRow>,
+}
+
+impl Section {
+    fn border_color(&self) -> Color {
+        if self.sel_item.section() == self.section {
+            Color::Green
+        } else {
+            Color::White
+        }
+    }
 }
 
 /// Individual row within a section
@@ -322,12 +342,17 @@ impl Widget for Section {
     where
         Self: Sized,
     {
+        let style = Style::default()
+            .fg(Color::Green)
+            .add_modifier(Modifier::BOLD);
+
         // Create block with border
         let block = Block::default()
             .title(self.title.clone())
-            .title_style(self.color.title_style())
+            .title_style(style)
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(self.color.border_color()));
+            .border_set(border::ROUNDED)
+            .border_style(Style::default().fg(self.border_color()));
 
         // Get inner area for content
         let inner = block.inner(area);
@@ -409,22 +434,6 @@ impl Widget for SectionRow {
                 Paragraph::new(line).render(area, buf);
             }
         }
-    }
-}
-
-impl SettingsSection {
-    fn border_color(self) -> Color {
-        match self {
-            SettingsSection::Timer => Color::Cyan,
-            SettingsSection::Hook => Color::Yellow,
-            SettingsSection::Alarm => Color::Magenta,
-        }
-    }
-
-    fn title_style(self) -> Style {
-        Style::default()
-            .fg(self.border_color())
-            .add_modifier(Modifier::BOLD)
     }
 }
 

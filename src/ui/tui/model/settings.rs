@@ -10,10 +10,14 @@ use crate::ui::Updateable;
 use crate::ui::tui::view::settings::SettingsPrompt;
 use crate::ui::update::config::SETTINGS_VIEW_ITEMS;
 
+static SETTINGS_SECTIONS: u32 = 3;
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum SettingsMsg {
     SelectUp,
     SelectDown,
+    SectionPrev,
+    SectionNext,
     ScrollUp,
     ScrollDown,
     // StartEditing(PomodoroConfig),
@@ -151,7 +155,7 @@ impl SettingsItem {
     }
 
     pub fn section(&self) -> SettingsSection {
-        SettingsSection::from_index(self.index()).unwrap()
+        SettingsSection::from_item_index(self.index()).unwrap()
     }
 
     pub fn is_toggle(&self) -> bool {
@@ -178,7 +182,7 @@ pub enum SettingsSection {
 }
 
 impl SettingsSection {
-    pub fn from_index(idx: u32) -> Option<Self> {
+    pub fn from_item_index(idx: u32) -> Option<Self> {
         use SettingsSection::*;
         let ret = match idx {
             0..=6 => Timer,
@@ -189,12 +193,41 @@ impl SettingsSection {
         Some(ret)
     }
 
-    pub fn label(&self) -> &'static str {
+    pub fn from_index(idx: u32) -> Option<Self> {
+        use SettingsSection::*;
+        let ret = match idx {
+            0 => Timer,
+            1 => Hook,
+            2 => Alarm,
+            _ => return None,
+        };
+        Some(ret)
+    }
+
+    pub fn index(&self) -> u32 {
         use SettingsSection::*;
         match self {
-            Timer => "Timer",
-            Hook => "Hook",
-            Alarm => "Alarm",
+            Timer => 0,
+            Hook => 1,
+            Alarm => 2,
+        }
+    }
+
+    pub fn item_begin_idx(&self) -> u32 {
+        match self.index() {
+            0 => 0,
+            1 => 7,
+            2 => 10,
+            _ => panic!("label called on invalid section"),
+        }
+    }
+
+    pub fn label(&self) -> &'static str {
+        match self.index() {
+            0 => "Timer",
+            1 => "Hook",
+            2 => "Alarm",
+            _ => panic!("label called on invalid section"),
         }
     }
 }
@@ -223,6 +256,8 @@ impl Updateable for SettingsModel {
         match msg {
             SelectUp => self.select_up(),
             SelectDown => self.select_down(),
+            SectionPrev => self.prev_section(),
+            SectionNext => self.next_section(),
             ScrollUp => self.scroll_up(),
             ScrollDown => self.scroll_down(),
             CancelEditing => self.cancel_editing(),
@@ -311,7 +346,7 @@ impl SettingsModel {
         });
     }
 
-    /// Move selection up
+    /// Select item up
     fn select_up(&mut self) {
         let idx = self
             .selected
@@ -321,7 +356,7 @@ impl SettingsModel {
         self.selected = SettingsItem::from_index(idx).unwrap();
     }
 
-    /// Move selection down
+    /// Select item down
     fn select_down(&mut self) {
         let idx = self
             .selected
@@ -329,6 +364,20 @@ impl SettingsModel {
             .saturating_add(1)
             .clamp(0, SETTINGS_VIEW_ITEMS - 1); // 13 items total
         self.selected = SettingsItem::from_index(idx).unwrap();
+    }
+
+    fn prev_section(&mut self) {
+        let idx = (self.selected.section().index() + SETTINGS_SECTIONS - 1) % SETTINGS_SECTIONS;
+        self.selected =
+            SettingsItem::from_index(SettingsSection::from_index(idx).unwrap().item_begin_idx())
+                .unwrap();
+    }
+
+    fn next_section(&mut self) {
+        let idx = (self.selected.section().index() + 1) % SETTINGS_SECTIONS;
+        self.selected =
+            SettingsItem::from_index(SettingsSection::from_index(idx).unwrap().item_begin_idx())
+                .unwrap();
     }
 
     /// Scroll up by one row

@@ -267,6 +267,12 @@ impl TuiRunner {
                 Up | Char('k') => {
                     let _ = self.update_settings(SelectUp);
                 }
+                BackTab => {
+                    let _ = self.update_settings(SectionPrev);
+                }
+                Tab => {
+                    let _ = self.update_settings(SectionNext);
+                }
                 Down | Char('j') => {
                     let _ = self.update_settings(SelectDown);
                 }
