@@ -237,8 +237,8 @@ impl TuiRunner {
                 Char('q') => self.quit(),
                 Char('s') => self.router_mut().navigate(Page::Settings),
                 Char('/') | Char('?') => {
-                    let show = !self.timer().show_shortcuts();
-                    self.update_timer(TimerMsg::SetShowShortcuts(show));
+                    let show = !self.timer().show_keybinds();
+                    self.update_timer(TimerMsg::SetShowKeybinds(show));
                 }
                 _ => {}
             }
@@ -303,7 +303,7 @@ impl TuiRunner {
                 Char(' ') if self.settings().selected().is_toggle() => self.apply_settings_edit(),
                 Esc => self.router_mut().navigate(Page::Timer),
                 Char('q') => self.quit(),
-                Char('/') | Char('?') => self.settings_mut().toggle_shortcuts(),
+                Char('/') | Char('?') => self.settings_mut().toggle_keybinds(),
                 _ => {}
             },
             Event::Mouse(mouse) => match mouse.kind {

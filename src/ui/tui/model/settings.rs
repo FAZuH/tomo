@@ -244,7 +244,7 @@ pub struct SettingsModel {
     scroll_state: ScrollViewState,
     prompt: Option<SettingsPrompt>,
     has_unsaved_changes: bool,
-    show_shortcuts: bool,
+    show_keybinds: bool,
 }
 
 impl Updateable for SettingsModel {
@@ -283,7 +283,7 @@ impl SettingsModel {
             scroll_state: ScrollViewState::default(),
             prompt: None,
             has_unsaved_changes: false,
-            show_shortcuts: false,
+            show_keybinds: false,
         }
     }
 
@@ -317,12 +317,12 @@ impl SettingsModel {
         self.prompt.is_some()
     }
 
-    pub fn show_shortcuts(&self) -> bool {
-        self.show_shortcuts
+    pub fn show_keybinds(&self) -> bool {
+        self.show_keybinds
     }
 
-    pub fn toggle_shortcuts(&mut self) {
-        self.show_shortcuts = !self.show_shortcuts;
+    pub fn toggle_keybinds(&mut self) {
+        self.show_keybinds = !self.show_keybinds;
     }
 
     pub fn start_editing_for_field(&mut self, config: &PomodoroConfig) {

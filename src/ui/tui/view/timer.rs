@@ -45,7 +45,7 @@ impl StatefulViewRef<Canvas<'_>> for TuiTimerView {
     fn render_stateful_ref(&self, canvas: Canvas, state: &mut Self::State) -> Self::Result {
         let (area, buf) = canvas;
         let TimerState { model, pomo } = state;
-        let show_shortcuts = model.show_shortcuts();
+        let show_binds = model.show_keybinds();
 
         let mode = pomo.mode();
         let timer = pomo.remaining_time();
@@ -64,7 +64,7 @@ impl StatefulViewRef<Canvas<'_>> for TuiTimerView {
             pomo.total_sessions(),
             pomo.focus_sessions(),
         );
-        self.shortcuts(rows[8], buf, show_shortcuts);
+        self.keybinds(rows[8], buf, show_binds);
         self.prompt(area, buf, model, pomo);
     }
 }
@@ -188,11 +188,11 @@ impl TuiTimerView {
             .render(area, buf);
     }
 
-    fn shortcuts(&self, area: Rect, buf: Buf, show: bool) {
+    fn keybinds(&self, area: Rect, buf: Buf, show: bool) {
         if show {
-            SHORTCUTS.clone().render(area, buf);
+            KEYBINDS_ON.clone().render(area, buf);
         } else {
-            SHORTCUT_HINT.clone().render(area, buf);
+            KEYBINDS_OFF.clone().render(area, buf);
         }
     }
 }
@@ -222,7 +222,7 @@ static LAYOUT: LazyLock<Layout> = LazyLock::new(|| {
         Constraint::Length(1),
         Constraint::Length(1), // stats
         Constraint::Length(1),
-        Constraint::Length(3), // shortcuts
+        Constraint::Length(3), // keybinds
         Constraint::Fill(1),
     ])
 });
@@ -253,7 +253,7 @@ static PAUSED_PARAGRAPH: LazyLock<Paragraph<'static>> = LazyLock::new(|| {
     )
 });
 
-static SHORTCUTS: LazyLock<Paragraph<'static>> = LazyLock::new(|| {
+static KEYBINDS_ON: LazyLock<Paragraph<'static>> = LazyLock::new(|| {
     let dim = Style::default().dim();
     let bright = Style::default();
     let sep = Span::styled(" • ", dim);
@@ -288,7 +288,7 @@ static SHORTCUTS: LazyLock<Paragraph<'static>> = LazyLock::new(|| {
     .alignment(Alignment::Center)
 });
 
-static SHORTCUT_HINT: LazyLock<Paragraph<'static>> = LazyLock::new(|| {
+static KEYBINDS_OFF: LazyLock<Paragraph<'static>> = LazyLock::new(|| {
     let dim = Style::default().dim();
     let bright = Style::default();
     let line = Line::from(vec![Span::styled("?", bright), Span::styled(": Help", dim)]);

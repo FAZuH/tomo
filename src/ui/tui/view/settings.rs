@@ -87,7 +87,7 @@ impl<'a> StatefulViewRef<Canvas<'a, '_>> for TuiSettingsView {
         scroll_view.render(content_area, buf, model.scroll_state_mut());
 
         // Render help bar at bottom
-        self.shortcuts(help_area, buf, model);
+        self.keybinds(help_area, buf, model);
 
         // Render prompt popup (over full area, including help bar)
         self.prompt(canvas, area, model);
@@ -101,11 +101,11 @@ impl TuiSettingsView {
         }
     }
 
-    fn shortcuts(&self, area: Rect, buf: &mut Buffer, model: &SettingsModel) {
-        if model.show_shortcuts() {
-            SHORTCUTS.clone().render(area, buf);
+    fn keybinds(&self, area: Rect, buf: &mut Buffer, model: &SettingsModel) {
+        if model.show_keybinds() {
+            KEYBINDS_ON.clone().render(area, buf);
         } else {
-            SHORTCUT_HINT.clone().render(area, buf);
+            KEYBINDS_OFF.clone().render(area, buf);
         }
     }
 
@@ -454,7 +454,7 @@ pub struct SettingsPrompt {
     pub label: String,
 }
 
-static SHORTCUTS: LazyLock<Paragraph<'static>> = LazyLock::new(|| {
+static KEYBINDS_ON: LazyLock<Paragraph<'static>> = LazyLock::new(|| {
     let dim = Style::default().dim();
     let bright = Style::default();
     let sep = Span::styled(" • ", dim);
@@ -492,7 +492,7 @@ static SHORTCUTS: LazyLock<Paragraph<'static>> = LazyLock::new(|| {
     .alignment(Alignment::Center)
 });
 
-static SHORTCUT_HINT: LazyLock<Paragraph<'static>> = LazyLock::new(|| {
+static KEYBINDS_OFF: LazyLock<Paragraph<'static>> = LazyLock::new(|| {
     let dim = Style::default().dim();
     let bright = Style::default();
     let line = Line::from(vec![Span::styled("?", bright), Span::styled(": Help", dim)]);
