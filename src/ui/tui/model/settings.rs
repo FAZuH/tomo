@@ -25,6 +25,7 @@ pub enum SettingsMsg {
     CancelEditing,
     TakeEditValue,
     SetUnsavedChanges(bool),
+    SetShowKeybinds(bool),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -270,6 +271,7 @@ impl Updateable for SettingsModel {
                 );
             }
             SetUnsavedChanges(v) => self.has_unsaved_changes = v,
+            SetShowKeybinds(v) => self.show_keybinds = v,
         }
 
         cmd
@@ -322,7 +324,8 @@ impl SettingsModel {
     }
 
     pub fn toggle_keybinds(&mut self) {
-        self.show_keybinds = !self.show_keybinds;
+        let new = !self.show_keybinds;
+        self.update(SettingsMsg::SetShowKeybinds(new));
     }
 
     pub fn start_editing_for_field(&mut self, config: &PomodoroConfig) {

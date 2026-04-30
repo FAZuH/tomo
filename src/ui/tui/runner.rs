@@ -237,8 +237,7 @@ impl TuiRunner {
                 Char('q') => self.quit(),
                 Char('s') => self.router_mut().navigate(Page::Settings),
                 Char('/') | Char('?') => {
-                    let show = !self.timer().show_keybinds();
-                    self.update_timer(TimerMsg::SetShowKeybinds(show));
+                    self.timer_mut().toggle_keybinds();
                 }
                 _ => {}
             }

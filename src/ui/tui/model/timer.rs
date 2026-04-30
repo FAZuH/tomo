@@ -43,4 +43,9 @@ impl TimerModel {
     pub fn show_keybinds(&self) -> bool {
         self.show_keybinds
     }
+
+    pub fn toggle_keybinds(&mut self) {
+        let new = !self.show_keybinds;
+        self.update(TimerMsg::SetShowKeybinds(new));
+    }
 }
