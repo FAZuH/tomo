@@ -340,9 +340,9 @@ impl SettingsModel {
             10 => alarm.focus.path(),
             11 => alarm.short.path(),
             12 => alarm.long.path(),
-            13 => alarm.focus.path(),
-            14 => alarm.short.path(),
-            15 => alarm.long.path(),
+            13 => alarm.focus.volume(),
+            14 => alarm.short.volume(),
+            15 => alarm.long.volume(),
             _ => return, // Cannot edit toggles or out of bounds
         };
 
