@@ -234,6 +234,10 @@ impl TuiRunner {
                 }
                 Char('q') => self.quit(),
                 Char('s') => self.router_mut().navigate(Page::Settings),
+                Char('/') | Char('?') => {
+                    let show = !self.timer().show_shortcuts();
+                    self.update_timer(TimerMsg::SetShowShortcuts(show));
+                }
                 _ => {}
             }
         }

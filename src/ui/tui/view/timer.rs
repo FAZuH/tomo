@@ -45,6 +45,7 @@ impl StatefulViewRef<Canvas<'_>> for TuiTimerView {
     fn render_stateful_ref(&self, canvas: Canvas, state: &mut Self::State) -> Self::Result {
         let (area, buf) = canvas;
         let TimerState { model, pomo } = state;
+        let show_shortcuts = model.show_shortcuts();
 
         let mode = pomo.mode();
         let timer = pomo.remaining_time();
@@ -63,7 +64,7 @@ impl StatefulViewRef<Canvas<'_>> for TuiTimerView {
             pomo.total_sessions(),
             pomo.focus_sessions(),
         );
-        self.shortcuts(rows[8], buf);
+        self.shortcuts(rows[8], buf, show_shortcuts);
         self.prompt(area, buf, model, pomo);
     }
 }
@@ -187,8 +188,12 @@ impl TuiTimerView {
             .render(area, buf);
     }
 
-    fn shortcuts(&self, area: Rect, buf: Buf) {
-        SHORTCUTS.clone().render(area, buf);
+    fn shortcuts(&self, area: Rect, buf: Buf, show: bool) {
+        if show {
+            SHORTCUTS.clone().render(area, buf);
+        } else {
+            SHORTCUT_HINT.clone().render(area, buf);
+        }
     }
 }
 
@@ -217,7 +222,7 @@ static LAYOUT: LazyLock<Layout> = LazyLock::new(|| {
         Constraint::Length(1),
         Constraint::Length(1), // stats
         Constraint::Length(1),
-        Constraint::Length(1), // shortcuts
+        Constraint::Length(3), // shortcuts
         Constraint::Fill(1),
     ])
 });
@@ -252,24 +257,37 @@ static SHORTCUTS: LazyLock<Paragraph<'static>> = LazyLock::new(|| {
     let dim = Style::default().dim();
     let bright = Style::default();
     let sep = Span::styled(" • ", dim);
-    let line = Line::from(vec![
-        Span::styled("Space", bright),
-        Span::styled(": Pause", dim),
-        sep.clone(),
-        Span::styled("Enter", bright),
-        Span::styled(": Skip", dim),
-        sep.clone(),
-        Span::styled("Backspace", bright),
-        Span::styled(": Reset", dim),
-        sep.clone(),
-        Span::styled(" ", bright),
-        Span::styled(": ±30s", dim),
-        sep.clone(),
-        Span::styled("", bright),
-        Span::styled(": ±1m", dim),
-        sep.clone(),
-        Span::styled("q", bright),
-        Span::styled(": Quit", dim),
-    ]);
+    Paragraph::new(vec![
+        Line::from(vec![
+            Span::styled("Space", bright),
+            Span::styled(": Pause", dim),
+            sep.clone(),
+            Span::styled("Enter", bright),
+            Span::styled(": Skip", dim),
+            sep.clone(),
+            Span::styled("Backspace", bright),
+            Span::styled(": Reset", dim),
+            sep.clone(),
+            Span::styled(" ", bright),
+            Span::styled(": ±30s", dim),
+            sep.clone(),
+            Span::styled("", bright),
+            Span::styled(": ±1m", dim),
+            sep.clone(),
+            Span::styled("q", bright),
+            Span::styled(": Quit", dim),
+        ]),
+        Line::from(vec![
+            Span::styled("?", bright),
+            Span::styled(": Disable Help", dim),
+        ]),
+    ])
+    .alignment(Alignment::Center)
+});
+
+static SHORTCUT_HINT: LazyLock<Paragraph<'static>> = LazyLock::new(|| {
+    let dim = Style::default().dim();
+    let bright = Style::default();
+    let line = Line::from(vec![Span::styled("?", bright), Span::styled(": Help", dim)]);
     Paragraph::new(line).alignment(Alignment::Center)
 });

@@ -3,6 +3,7 @@ use crate::ui::Updateable;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TimerMsg {
     SetPromptNextSession(bool),
+    SetShowShortcuts(bool),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -10,9 +11,10 @@ pub enum TimerCmd {
     None,
 }
 
-#[derive(Debug, Default, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Default)]
 pub struct TimerModel {
     prompt_transition: bool,
+    show_shortcuts: bool,
 }
 
 impl Updateable for TimerModel {
@@ -23,6 +25,7 @@ impl Updateable for TimerModel {
         use TimerMsg::*;
         match msg {
             SetPromptNextSession(v) => self.prompt_transition = v,
+            SetShowShortcuts(v) => self.show_shortcuts = v,
         }
         TimerCmd::None
     }
@@ -35,5 +38,9 @@ impl TimerModel {
 
     pub fn prompt_transition(&self) -> bool {
         self.prompt_transition
+    }
+
+    pub fn show_shortcuts(&self) -> bool {
+        self.show_shortcuts
     }
 }
