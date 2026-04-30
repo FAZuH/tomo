@@ -1,0 +1,69 @@
+name: Build
+
+on:
+  workflow_call:
+    inputs:
+      cargo-build-args:
+        description: 'Arguments to pass to cargo build'
+        required: false
+        type: string
+        default: '--all-features --all-targets'
+      upload-binary:
+        description: 'Whether to upload the binary artifact'
+        required: false
+        type: boolean
+        default: false
+      binary-artifact-name:
+        description: 'Name of the binary artifact'
+        required: false
+        type: string
+        default: 'tomo'
+      binary-artifact-path:
+        description: 'Path to the binary artifact'
+        required: false
+        type: string
+        default: 'target/release/tomo'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-binary:
+    name: Build Binary
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Set up Stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "ci"
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y pkg-config libfontconfig1-dev libsqlite3-dev libasound2-dev
+
+      - name: Download Patched Cargo.toml
+        uses: actions/download-artifact@v4
+        with:
+          name: patched-cargo-toml
+          path: .
+        continue-on-error: true
+
+      - name: Build
+        run: cargo build ${{ inputs.cargo-build-args }}
+
+      - name: Upload Binary Artifact
+        if: ${{ inputs.upload-binary }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.binary-artifact-name }}
+          path: ${{ inputs.binary-artifact-path }}

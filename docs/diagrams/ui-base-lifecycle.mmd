@@ -1,51 +1,47 @@
 sequenceDiagram
     autonumber
-    participant V as View (Platform)
-    participant R as Router
-    participant TU as TimerUpdate
-    participant SU as SettingsUpdate
+    participant R as Runner
+    participant TH as TickHandler
     participant P as Pomodoro
     participant C as Config
+    participant V as View
 
     rect rgb(180, 200, 220)
-        note right of V: INITIALIZATION
-        V->>V: Router::new(Page::Timer)
+        note right of R: INITIALIZATION
+        R->>R: Router::new(Page::Timer)
         activate R
-        R-->>V: router
+        R-->>R: router
         deactivate R
     end
 
     rect rgb(180, 220, 190)
-        note right of V: EVENT LOOP
-        loop Every event (tick, input)
-            opt On Tick
-                V->>TU: tick(auto_next, &pomodoro)
-                TU-->>V: TimerCmd
-                V->>P: apply cmd (e.g. next_state)
+        note right of R: EVENT LOOP
+        loop Until Quit
+            R->>TH: new_tick()
+            TH-->>R: tick_elapsed?
+
+            opt Has Input
+                alt Timer Input
+                    R->>R: Map input to PomodoroMsg
+                    R->>P: update(msg)
+                    activate P
+                    P-->>R: PomodoroCmd
+                    deactivate P
+                    R->>R: handle_pomodoro_cmd(cmd)
+                else Settings Input
+                    R->>R: Map input to ConfigMsg
+                    R->>C: update(msg)
+                    activate C
+                    C-->>R: ConfigCmd
+                    deactivate C
+                else Navigation Input
+                    R->>R: Router::navigate(Navigation)
+                end
+                R->>R: redraw = true
             end
-            opt On Timer Input
-                V->>V: Map input to TimerMsg
-                V->>TU: update(msg, pomodoro)
-                activate TU
-                TU->>P: apply msg logic
-                TU-->>V: (updated_pomodoro, TimerCmd)
-                deactivate TU
-                V->>V: handle_timer_cmd(TimerCmd)
-            end
-            opt On Settings Input
-                V->>V: Map input to SettingsMsg
-                V->>SU: update(msg, config)
-                activate SU
-                SU->>C: apply msg logic
-                SU-->>V: (updated_config, SettingsCmd)
-                deactivate SU
-            end
-            opt On Navigation Input
-                V->>R: navigate(Navigation)
-                activate R
-                R->>R: update active_page
-                R-->>V: return
-                deactivate R
+
+            opt Redraw
+                R->>V: render_stateful_ref(frame, context, state)
             end
         end
     end

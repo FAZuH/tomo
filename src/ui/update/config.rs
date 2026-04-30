@@ -3,12 +3,12 @@ use std::time::Duration;
 
 use crate::config::Config;
 use crate::config::Percentage;
-use crate::ui::Update;
+use crate::ui::Updateable;
 
 pub const SETTINGS_VIEW_ITEMS: u32 = 16;
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum SettingsMsg {
+pub enum ConfigMsg {
     // Timer settings
     TimerFocus(Duration),
     TimerShort(Duration),
@@ -32,36 +32,21 @@ pub enum SettingsMsg {
     AlarmVolumeLong(Percentage),
 }
 
-impl SettingsMsg {
-    pub fn is_toggle_index(index: u32) -> bool {
-        (4..=6).contains(&index)
-    }
-}
-
-#[derive(Debug)]
-pub enum SettingsCmd {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConfigCmd {
     None,
 }
 
-pub struct SettingsUpdate {}
+impl Updateable for Config {
+    type Msg = ConfigMsg;
+    type Cmd = ConfigCmd;
 
-impl SettingsUpdate {
-    pub fn new() -> Self {
-        Self {}
-    }
-}
-
-impl Update for SettingsUpdate {
-    type Msg = SettingsMsg;
-    type Model = Config;
-    type Cmd = SettingsCmd;
-
-    fn update(msg: Self::Msg, model: &mut Self::Model) -> Self::Cmd {
-        use SettingsMsg::*;
-        let timer = &mut model.pomodoro.timer;
-        let hook = &mut model.pomodoro.hook;
-        let alarm = &mut model.pomodoro.alarm;
-        let cmd = SettingsCmd::None;
+    fn update(&mut self, msg: Self::Msg) -> Self::Cmd {
+        use ConfigMsg::*;
+        let timer = &mut self.pomodoro.timer;
+        let hook = &mut self.pomodoro.hook;
+        let alarm = &mut self.pomodoro.alarm;
+        let cmd = ConfigCmd::None;
         match msg {
             // Timer
             TimerFocus(d) => timer.focus = d,
