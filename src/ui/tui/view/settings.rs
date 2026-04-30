@@ -14,7 +14,6 @@ use tui_widgets::scrollview::ScrollView;
 use tui_widgets::scrollview::ScrollbarVisibility;
 
 use crate::config::Config;
-use crate::config::pomodoro::Alarm;
 use crate::config::pomodoro::Alarms;
 use crate::config::pomodoro::Hooks;
 use crate::config::pomodoro::PomodoroConfig;
@@ -137,166 +136,130 @@ impl TuiSettingsRenderer {
     fn build_timer_section(
         &self,
         model: &SettingsModel,
-        config: &Timers,
+        conf: &Timers,
         sections: &mut Vec<Section>,
-        item_idx: &mut u32,
+        i: &mut u32,
     ) {
         // Build Pomodoro Timer section
         let label = "󰔛 Pomodoro Timer";
         let color = SectionColor::from_label(label);
-        let mut rows = Vec::new();
+        let mut r = Vec::new();
 
         // Durations subsection
-        if !rows.is_empty() {
-            rows.push(SectionRow::Blank);
+        if !r.is_empty() {
+            r.push(SectionRow::Blank);
         }
-        rows.push(SectionRow::SubSectionHeader("Durations".to_string()));
-        self.add_input_to_rows(
+        r.push(SectionRow::SubSectionHeader("Durations".to_string()));
+        self.add_inpt(
             model,
             "Focus",
-            format!("{}", config.focus.as_secs() / 60),
-            &mut rows,
-            item_idx,
+            format!("{}", conf.focus.as_secs() / 60),
+            &mut r,
+            i,
         );
-        self.add_input_to_rows(
+        self.add_inpt(
             model,
             "Short Break",
-            format!("{}", config.short.as_secs() / 60),
-            &mut rows,
-            item_idx,
+            format!("{}", conf.short.as_secs() / 60),
+            &mut r,
+            i,
         );
-        self.add_input_to_rows(
+        self.add_inpt(
             model,
             "Long Break",
-            format!("{}", config.long.as_secs() / 60),
-            &mut rows,
-            item_idx,
+            format!("{}", conf.long.as_secs() / 60),
+            &mut r,
+            i,
         );
 
-        self.add_input_to_rows(
+        self.add_inpt(
             model,
             "Long Break Interval",
-            format!("{}", config.long_interval),
-            &mut rows,
-            item_idx,
+            format!("{}", conf.long_interval),
+            &mut r,
+            i,
         );
 
         // Auto Start subsection
-        if !rows.is_empty() {
-            rows.push(SectionRow::Blank);
+        if !r.is_empty() {
+            r.push(SectionRow::Blank);
         }
-        rows.push(SectionRow::SubSectionHeader("Auto Start".to_string()));
-        self.add_checkbox_to_rows(model, "Focus", config.auto_focus, &mut rows, item_idx);
-        self.add_checkbox_to_rows(model, "Short Break", config.auto_short, &mut rows, item_idx);
-        self.add_checkbox_to_rows(model, "Long Break", config.auto_long, &mut rows, item_idx);
+        r.push(SectionRow::SubSectionHeader("Auto Start".to_string()));
+        self.add_box(model, "Focus", conf.auto_focus, &mut r, i);
+        self.add_box(model, "Short Break", conf.auto_short, &mut r, i);
+        self.add_box(model, "Long Break", conf.auto_long, &mut r, i);
 
-        let height = 2 + rows.iter().map(|r| r.height()).sum::<u16>();
+        let height = 2 + r.iter().map(|r| r.height()).sum::<u16>();
         sections.push(Section {
             title: label.to_string(),
             color,
             height,
-            rows,
+            rows: r,
         });
     }
 
     fn build_hooks_section(
         &self,
         model: &SettingsModel,
-        config: &Hooks,
+        conf: &Hooks,
         sections: &mut Vec<Section>,
-        item_idx: &mut u32,
+        i: &mut u32,
     ) {
         // Build Command Hooks section
         let label = "󰛢 Command Hooks";
         let color = SectionColor::from_label(label);
-        let mut rows = Vec::new();
+        let mut r = Vec::new();
 
         // Hooks subsection
-        if !rows.is_empty() {
-            rows.push(SectionRow::Blank);
+        if !r.is_empty() {
+            r.push(SectionRow::Blank);
         }
-        rows.push(SectionRow::SubSectionHeader("Hooks".to_string()));
-        self.add_input_to_rows(model, "Focus", &config.focus, &mut rows, item_idx);
-        self.add_input_to_rows(model, "Short Break", &config.short, &mut rows, item_idx);
-        self.add_input_to_rows(model, "Long Break", &config.long, &mut rows, item_idx);
+        r.push(SectionRow::SubSectionHeader("Hooks".to_string()));
+        self.add_inpt(model, "Focus", &conf.focus, &mut r, i);
+        self.add_inpt(model, "Short Break", &conf.short, &mut r, i);
+        self.add_inpt(model, "Long Break", &conf.long, &mut r, i);
 
-        let height = 2 + rows.iter().map(|r| r.height()).sum::<u16>();
+        let height = 2 + r.iter().map(|r| r.height()).sum::<u16>();
         sections.push(Section {
             title: label.to_string(),
             color,
             height,
-            rows,
+            rows: r,
         });
     }
 
     fn build_alarm_section(
         &self,
         model: &SettingsModel,
-        config: &Alarms,
+        conf: &Alarms,
         sections: &mut Vec<Section>,
-        item_idx: &mut u32,
+        i: &mut u32,
     ) {
-        let mut rows = Vec::new();
+        let mut r = Vec::new();
 
         // Alarm Files subsection
-        rows.push(SectionRow::SubSectionHeader("Alarm Files".to_string()));
-        self.add_input_to_rows(
-            model,
-            "Focus",
-            get_alarm_path_value(&config.focus),
-            &mut rows,
-            item_idx,
-        );
-        self.add_input_to_rows(
-            model,
-            "Short Break",
-            get_alarm_path_value(&config.short),
-            &mut rows,
-            item_idx,
-        );
-        self.add_input_to_rows(
-            model,
-            "Long Break",
-            get_alarm_path_value(&config.long),
-            &mut rows,
-            item_idx,
-        );
+        r.push(SectionRow::SubSectionHeader("Alarm Files".to_string()));
+        self.add_inpt(model, "Focus", conf.focus.path(), &mut r, i);
+        self.add_inpt(model, "Short Break", conf.short.path(), &mut r, i);
+        self.add_inpt(model, "Long Break", conf.long.path(), &mut r, i);
 
         // Alarm Volumes subsection
-        rows.push(SectionRow::Blank);
-        rows.push(SectionRow::SubSectionHeader("Alarm Volumes".to_string()));
-        self.add_input_to_rows(
-            model,
-            "Focus",
-            get_alarm_volume_value(&config.focus),
-            &mut rows,
-            item_idx,
-        );
-        self.add_input_to_rows(
-            model,
-            "Short Break",
-            get_alarm_volume_value(&config.short),
-            &mut rows,
-            item_idx,
-        );
-        self.add_input_to_rows(
-            model,
-            "Long Break",
-            get_alarm_volume_value(&config.long),
-            &mut rows,
-            item_idx,
-        );
+        r.push(SectionRow::Blank);
+        r.push(SectionRow::SubSectionHeader("Alarm Volumes".to_string()));
+        self.add_inpt(model, "Focus", conf.focus.volume(), &mut r, i);
+        self.add_inpt(model, "Short Break", conf.short.volume(), &mut r, i);
+        self.add_inpt(model, "Long Break", conf.long.volume(), &mut r, i);
 
-        let height = 2 + rows.iter().map(|r| r.height()).sum::<u16>();
+        let height = 2 + r.iter().map(|r| r.height()).sum::<u16>();
         sections.push(Section {
             title: "󰕾 Alarm".to_string(),
             color: SectionColor::Alarm,
             height,
-            rows,
+            rows: r,
         });
     }
 
-    fn add_input_to_rows(
+    fn add_inpt(
         &self,
         model: &SettingsModel,
         label: impl ToString,
@@ -313,7 +276,7 @@ impl TuiSettingsRenderer {
         });
     }
 
-    fn add_checkbox_to_rows(
+    fn add_box(
         &self,
         model: &SettingsModel,
         label: &str,
@@ -501,18 +464,6 @@ impl SectionColor {
 pub struct SettingsPrompt {
     pub text_state: TextState<'static>,
     pub label: String,
-}
-
-fn get_alarm_path_value(alarm: &Alarm) -> String {
-    alarm
-        .path
-        .as_ref()
-        .map(|p| p.display().to_string())
-        .unwrap_or_default()
-}
-
-fn get_alarm_volume_value(alarm: &Alarm) -> String {
-    alarm.volume.to_string()
 }
 
 static TITLE: LazyLock<BigText<'static>> = LazyLock::new(|| {

@@ -1,6 +1,6 @@
-pub mod settings;
-pub mod timer;
-pub use settings::ConfigCmd;
-pub use settings::ConfigMsg;
-pub use timer::PomodoroCmd;
-pub use timer::PomodoroMsg;
+pub mod config;
+pub mod pomor;
+pub use config::ConfigCmd;
+pub use config::ConfigMsg;
+pub use pomor::PomodoroCmd;
+pub use pomor::PomodoroMsg;
