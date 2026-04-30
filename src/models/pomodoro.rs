@@ -1,7 +1,7 @@
 use std::time::Duration;
 use std::time::Instant;
 
-use State::*;
+use Mode::*;
 
 #[derive(Clone, Debug)]
 pub struct Pomodoro {
@@ -20,7 +20,7 @@ pub struct Pomodoro {
 
     // Session data
     running: bool,
-    state: State,
+    mode: Mode,
 
     /// Anchor instant for the current running segment.
     /// Always set when running, None when paused.
@@ -108,7 +108,7 @@ impl Pomodoro {
 
     /// Skips to the next session.
     pub fn skip(&mut self) {
-        self.go_next_state();
+        self.go_next_mode();
         self.reset_time();
     }
 
@@ -117,8 +117,8 @@ impl Pomodoro {
         self.reset_time();
     }
 
-    pub fn state(&self) -> State {
-        self.state
+    pub fn mode(&self) -> Mode {
+        self.mode
     }
 
     pub fn is_running(&self) -> bool {
@@ -148,32 +148,43 @@ impl Pomodoro {
         }
     }
 
+    pub fn progress(&self) -> f64 {
+        let timer = self.remaining_time();
+        let total_time = self.session_duration();
+
+        if total_time.as_secs() > 0 {
+            1.0 - (timer.as_secs_f64() / total_time.as_secs_f64())
+        } else {
+            0.0
+        }
+    }
+
     pub fn long_interval(&self) -> u32 {
         self.long_interval
     }
 
-    /// Gets session duration based on current state.
+    /// Gets session duration based on current mode.
     pub fn session_duration(&self) -> Duration {
-        match self.state {
+        match self.mode {
             Focus => self.focus,
             LongBreak => self.long_break,
             ShortBreak => self.short_break,
         }
     }
 
-    /// Go to the next state.
-    fn go_next_state(&mut self) {
+    /// Go to the next mode.
+    fn go_next_mode(&mut self) {
         self.total_sessions += 1;
-        let prev_state = self.state();
-        self.state = self.next_state();
-        if prev_state == Focus {
+        let prev = self.mode();
+        self.mode = self.next_mode();
+        if prev == Focus {
             self.focus_sessions += 1;
         }
     }
 
-    /// Gets the next state after this state.
-    pub fn next_state(&self) -> State {
-        match self.state {
+    /// Gets the next mode after this mode.
+    pub fn next_mode(&self) -> Mode {
+        match self.mode {
             Focus => {
                 if (self.focus_sessions + 1).is_multiple_of(self.long_interval) {
                     LongBreak
@@ -217,7 +228,7 @@ impl Pomodoro {
 impl Default for Pomodoro {
     fn default() -> Self {
         Self {
-            state: State::Focus,
+            mode: Mode::Focus,
             focus: Duration::from_mins(25),
             long_break: Duration::from_mins(15),
             short_break: Duration::from_mins(5),
@@ -233,13 +244,13 @@ impl Default for Pomodoro {
 }
 
 #[derive(Clone, Debug, Copy, PartialEq, Eq, Hash)]
-pub enum State {
+pub enum Mode {
     Focus,
     LongBreak,
     ShortBreak,
 }
 
-impl std::fmt::Display for State {
+impl std::fmt::Display for Mode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Focus => write!(f, "Focus"),
@@ -266,43 +277,43 @@ mod tests {
     use super::*;
 
     #[test]
-    fn next_state_focus() {
+    fn next_mode_focus() {
         let mut pomo = Pomodoro {
-            state: ShortBreak,
+            mode: ShortBreak,
             ..Default::default()
         };
 
-        assert_eq!(pomo.next_state(), Focus);
-        pomo.go_next_state();
-        assert_eq!(pomo.state(), Focus)
+        assert_eq!(pomo.next_mode(), Focus);
+        pomo.go_next_mode();
+        assert_eq!(pomo.mode(), Focus)
     }
 
     #[test]
-    fn next_state_short_break() {
+    fn next_mode_short_break() {
         let mut pomo = Pomodoro::default();
 
-        assert_eq!(pomo.next_state(), ShortBreak);
-        pomo.go_next_state();
-        assert_eq!(pomo.state(), ShortBreak)
+        assert_eq!(pomo.next_mode(), ShortBreak);
+        pomo.go_next_mode();
+        assert_eq!(pomo.mode(), ShortBreak)
     }
 
     #[test]
-    fn next_state_long_break() {
+    fn next_mode_long_break() {
         let mut pomo = Pomodoro::default();
 
         // Short break
-        pomo.go_next_state();
+        pomo.go_next_mode();
         // Focus
-        pomo.go_next_state();
+        pomo.go_next_mode();
         // Short break
-        pomo.go_next_state();
+        pomo.go_next_mode();
         // Focus
-        pomo.go_next_state();
+        pomo.go_next_mode();
 
         // Long Break
-        assert_eq!(pomo.next_state(), LongBreak);
-        pomo.go_next_state();
-        assert_eq!(pomo.state(), LongBreak)
+        assert_eq!(pomo.next_mode(), LongBreak);
+        pomo.go_next_mode();
+        assert_eq!(pomo.mode(), LongBreak)
     }
 
     #[test]
@@ -326,7 +337,7 @@ mod tests {
         let mut pomo = Pomodoro {
             focus_sessions: 1,
             total_sessions: 1,
-            state: Focus,
+            mode: Focus,
             running: true,
             anchor: None,
             ..Default::default()
@@ -335,7 +346,7 @@ mod tests {
         pomo.skip();
 
         assert_eq!((pomo.focus_sessions(), pomo.total_sessions()), (2, 2));
-        assert_eq!(pomo.state(), ShortBreak);
+        assert_eq!(pomo.mode(), ShortBreak);
 
         assert_ne!(pomo.started_at(), None);
         let diff = pomo
@@ -350,7 +361,7 @@ mod tests {
         let mut pomo = Pomodoro {
             focus_sessions: 0,
             total_sessions: 0,
-            state: Focus,
+            mode: Focus,
             long_interval: 2,
             ..Default::default()
         };

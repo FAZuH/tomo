@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::sync::LazyLock;
 
 use ratatui::layout::Flex;
 use ratatui::prelude::*;
@@ -8,13 +9,8 @@ use ratatui::widgets::Clear;
 use ratatui::widgets::Paragraph;
 use tui_widgets::big_text::BigText;
 use tui_widgets::big_text::PixelSize;
-use tui_widgets::prompts::FocusState;
-use tui_widgets::prompts::Prompt;
-use tui_widgets::prompts::State as PromptState;
-use tui_widgets::prompts::TextPrompt;
-use tui_widgets::prompts::TextState;
+use tui_widgets::prompts::prelude::*;
 use tui_widgets::scrollview::ScrollView;
-use tui_widgets::scrollview::ScrollViewState;
 use tui_widgets::scrollview::ScrollbarVisibility;
 
 use crate::config::Config;
@@ -23,142 +19,41 @@ use crate::config::pomodoro::Alarms;
 use crate::config::pomodoro::Hooks;
 use crate::config::pomodoro::PomodoroConfig;
 use crate::config::pomodoro::Timers;
-use crate::ui::update::settings::SETTINGS_VIEW_ITEMS;
+use crate::ui::tui::model::SettingsModel;
 
-pub struct TuiSettingsRenderer {
-    scroll_state: ScrollViewState,
-    selected_idx: u32,
-    prompt: Option<SettingsPrompt>,
-    has_unsaved_changes: bool,
-}
+type State = SettingsState;
+type Buf<'a> = &'a mut Buffer;
+
+pub struct TuiSettingsRenderer {}
 
 impl TuiSettingsRenderer {
     pub fn new() -> Self {
-        Self {
-            scroll_state: ScrollViewState::default(),
-            selected_idx: 0,
-            prompt: None,
-            has_unsaved_changes: false,
-        }
+        Self {}
     }
+}
 
-    /// Move selection up
-    pub fn select_up(&mut self) {
-        self.selected_idx = self
-            .selected_idx
-            .saturating_sub(1)
-            .clamp(0, SETTINGS_VIEW_ITEMS - 1); // 13 items total
+pub struct SettingsState {
+    pub(super) model: SettingsModel,
+    pub(super) conf: Config,
+}
+
+impl SettingsState {
+    pub fn new(model: SettingsModel, conf: Config) -> Self {
+        Self { model, conf }
     }
+}
 
-    /// Move selection down
-    pub fn select_down(&mut self) {
-        self.selected_idx = self
-            .selected_idx
-            .saturating_add(1)
-            .clamp(0, SETTINGS_VIEW_ITEMS - 1);
-    }
+impl StatefulWidget for TuiSettingsRenderer {
+    type State = State;
 
-    /// Scroll up by one row
-    pub fn scroll_up(&mut self) {
-        self.scroll_state.scroll_up();
-    }
+    fn render(self, area: Rect, buf: Buf, state: &mut Self::State) {
+        let SettingsState { model, conf } = state;
 
-    /// Scroll down by one row
-    pub fn scroll_down(&mut self) {
-        self.scroll_state.scroll_down();
-    }
-
-    /// Start editing the currently selected field
-    pub fn start_editing_for_field(&mut self, config: &PomodoroConfig) {
-        let (label, value) = match self.selected_idx {
-            0 => ("Focus", format!("{}", config.timer.focus.as_secs() / 60)),
-            1 => (
-                "Short Break",
-                format!("{}", config.timer.short.as_secs() / 60),
-            ),
-            2 => (
-                "Long Break",
-                format!("{}", config.timer.long.as_secs() / 60),
-            ),
-            3 => (
-                "Long Break Interval",
-                format!("{}", config.timer.long_interval),
-            ),
-            7 => ("Focus Hook", config.hook.focus.clone()),
-            8 => ("Short Break Hook", config.hook.short.clone()),
-            9 => ("Long Break Hook", config.hook.long.clone()),
-            10 => ("Focus Alarm", get_alarm_path_value(&config.alarm.focus)),
-            11 => (
-                "Short Break Alarm",
-                get_alarm_path_value(&config.alarm.short),
-            ),
-            12 => ("Long Break Alarm", get_alarm_path_value(&config.alarm.long)),
-            13 => (
-                "Focus Alarm Volume",
-                get_alarm_volume_value(&config.alarm.focus),
-            ),
-            14 => (
-                "Short Break Alarm Volume",
-                get_alarm_volume_value(&config.alarm.short),
-            ),
-            15 => (
-                "Long Break Alarm Volume",
-                get_alarm_volume_value(&config.alarm.long),
-            ),
-            _ => return, // Cannot edit toggles or out of bounds
-        };
-
-        let value_len = value.len();
-        let mut text_state = TextState::new()
-            .with_focus(FocusState::Focused)
-            .with_value(value);
-        *PromptState::position_mut(&mut text_state) = value_len;
-
-        self.prompt = Some(SettingsPrompt {
-            text_state,
-            label: label.to_string(),
-        });
-    }
-
-    /// Cancel editing
-    pub fn cancel_editing(&mut self) {
-        self.prompt = None;
-    }
-
-    /// Get current selection index
-    pub fn selected_idx(&self) -> u32 {
-        self.selected_idx
-    }
-
-    /// Check if currently editing
-    pub fn is_editing(&self) -> bool {
-        self.prompt.is_some()
-    }
-
-    pub fn prompt_state_mut(&mut self) -> Option<&mut SettingsPrompt> {
-        self.prompt.as_mut()
-    }
-
-    /// Take the finalized edit value
-    pub fn take_edit_value(&mut self) -> String {
-        if let Some(prompt) = self.prompt.take() {
-            prompt.text_state.value().to_string()
-        } else {
-            String::new()
-        }
-    }
-
-    pub fn set_has_unsaved_changes(&mut self, state: bool) {
-        self.has_unsaved_changes = state;
-    }
-
-    pub fn render(&mut self, frame: &mut Frame, config: &Config) {
-        let area = frame.area();
         // Reserve space for scrollbar and padding
         let content_width = area.width.saturating_sub(4).max(46);
 
         // Build sections with proper layout
-        let sections = self.build_sections(&config.pomodoro);
+        let sections = self.build_sections(model, &conf.pomodoro);
 
         // Calculate total height: title (4) + spacing (1) + sections + padding (2)
         let sections_height: u16 = sections.iter().map(|s| s.height).sum();
@@ -170,11 +65,11 @@ impl TuiSettingsRenderer {
 
         // Render title at top
         let title_area = Rect::new(0, 0, content_width, 4);
-        self.render_title(&mut scroll_view, title_area);
+        self.title(&mut scroll_view, title_area);
 
         // Render unsaved changes indicator in the spacing row between title and sections
         let indicator_area = Rect::new(0, 4, content_width, 1);
-        self.render_unsaved_indicator(&mut scroll_view, indicator_area);
+        self.save_indicator(&mut scroll_view, indicator_area, model);
 
         // Render sections with proper spacing
         let mut y = 5u16; // Start after title + 1 row spacing
@@ -184,42 +79,27 @@ impl TuiSettingsRenderer {
             scroll_view.render_widget(section, section_area);
         }
 
-        frame.render_stateful_widget(scroll_view, area, &mut self.scroll_state);
+        scroll_view.render(area, buf, model.scroll_state_mut());
 
         // Render prompt popup
-        self.render_prompt(frame, area);
+        self.prompt(area, buf, model);
+    }
+}
+
+impl TuiSettingsRenderer {
+    fn title(&self, scroll: &mut ScrollView, area: Rect) {
+        scroll.render_widget(TITLE.clone(), area);
     }
 
-    fn render_title(&self, scroll_view: &mut ScrollView, area: Rect) {
-        let big_text = BigText::builder()
-            .pixel_size(PixelSize::Quadrant)
-            .style(
-                Style::default()
-                    .fg(Color::Cyan)
-                    .add_modifier(Modifier::BOLD),
-            )
-            .lines(vec!["Settings".into()])
-            .centered()
-            .build();
-        scroll_view.render_widget(big_text, area);
-    }
-
-    fn render_unsaved_indicator(&self, scroll_view: &mut ScrollView, area: Rect) {
-        if !self.has_unsaved_changes {
-            return;
+    fn save_indicator(&self, scroll: &mut ScrollView, area: Rect, model: &mut SettingsModel) {
+        if model.has_unsaved_changes() {
+            scroll.render_widget(SAVED_INDICATOR.clone(), area);
         }
-        let line = Line::from(vec![Span::styled(
-            "● Unsaved changes",
-            Style::default()
-                .fg(Color::Yellow)
-                .add_modifier(Modifier::BOLD),
-        )]);
-        scroll_view.render_widget(Paragraph::new(line), area);
     }
 
-    fn render_prompt(&mut self, frame: &mut Frame, area: Rect) {
+    fn prompt(&self, area: Rect, buf: Buf, model: &mut SettingsModel) {
         // Render prompt overlay
-        if let Some(ref mut prompt) = self.prompt {
+        if let Some(ref mut prompt) = model.prompt_state_mut() {
             let popup_width = 50.min(area.width.saturating_sub(4));
             let popup_height = 3;
 
@@ -229,33 +109,34 @@ impl TuiSettingsRenderer {
             let [popup_area] = vertical.areas(area);
             let [popup_area] = horizontal.areas(popup_area);
 
-            frame.render_widget(Clear, popup_area);
+            Clear.render(popup_area, buf);
 
             let block = Block::default()
                 .title(prompt.label.clone())
                 .borders(Borders::ALL)
                 .border_style(Style::default().fg(Color::Cyan));
             let inner = block.inner(popup_area);
-            frame.render_widget(block, popup_area);
+            block.render(popup_area, buf);
 
-            TextPrompt::new(Cow::Borrowed("")).draw(frame, inner, &mut prompt.text_state);
+            TextPrompt::new(Cow::Borrowed("")).render(inner, buf, &mut prompt.text_state);
         }
     }
 
     /// Build sections from config, calculating layout and identifying editable items
-    fn build_sections(&self, config: &PomodoroConfig) -> Vec<Section> {
+    fn build_sections(&self, model: &SettingsModel, config: &PomodoroConfig) -> Vec<Section> {
         let mut sections = Vec::new();
         let mut item_idx = 0u32;
 
-        self.build_timer_section(&config.timer, &mut sections, &mut item_idx);
-        self.build_hooks_section(&config.hook, &mut sections, &mut item_idx);
-        self.build_alarm_section(&config.alarm, &mut sections, &mut item_idx);
+        self.build_timer_section(model, &config.timer, &mut sections, &mut item_idx);
+        self.build_hooks_section(model, &config.hook, &mut sections, &mut item_idx);
+        self.build_alarm_section(model, &config.alarm, &mut sections, &mut item_idx);
 
         sections
     }
 
     fn build_timer_section(
         &self,
+        model: &SettingsModel,
         config: &Timers,
         sections: &mut Vec<Section>,
         item_idx: &mut u32,
@@ -271,18 +152,21 @@ impl TuiSettingsRenderer {
         }
         rows.push(SectionRow::SubSectionHeader("Durations".to_string()));
         self.add_input_to_rows(
+            model,
             "Focus",
             format!("{}", config.focus.as_secs() / 60),
             &mut rows,
             item_idx,
         );
         self.add_input_to_rows(
+            model,
             "Short Break",
             format!("{}", config.short.as_secs() / 60),
             &mut rows,
             item_idx,
         );
         self.add_input_to_rows(
+            model,
             "Long Break",
             format!("{}", config.long.as_secs() / 60),
             &mut rows,
@@ -290,6 +174,7 @@ impl TuiSettingsRenderer {
         );
 
         self.add_input_to_rows(
+            model,
             "Long Break Interval",
             format!("{}", config.long_interval),
             &mut rows,
@@ -301,9 +186,9 @@ impl TuiSettingsRenderer {
             rows.push(SectionRow::Blank);
         }
         rows.push(SectionRow::SubSectionHeader("Auto Start".to_string()));
-        self.add_checkbox_to_rows("Focus", config.auto_focus, &mut rows, item_idx);
-        self.add_checkbox_to_rows("Short Break", config.auto_short, &mut rows, item_idx);
-        self.add_checkbox_to_rows("Long Break", config.auto_long, &mut rows, item_idx);
+        self.add_checkbox_to_rows(model, "Focus", config.auto_focus, &mut rows, item_idx);
+        self.add_checkbox_to_rows(model, "Short Break", config.auto_short, &mut rows, item_idx);
+        self.add_checkbox_to_rows(model, "Long Break", config.auto_long, &mut rows, item_idx);
 
         let height = 2 + rows.iter().map(|r| r.height()).sum::<u16>();
         sections.push(Section {
@@ -314,7 +199,13 @@ impl TuiSettingsRenderer {
         });
     }
 
-    fn build_hooks_section(&self, config: &Hooks, sections: &mut Vec<Section>, item_idx: &mut u32) {
+    fn build_hooks_section(
+        &self,
+        model: &SettingsModel,
+        config: &Hooks,
+        sections: &mut Vec<Section>,
+        item_idx: &mut u32,
+    ) {
         // Build Command Hooks section
         let label = "󰛢 Command Hooks";
         let color = SectionColor::from_label(label);
@@ -325,9 +216,9 @@ impl TuiSettingsRenderer {
             rows.push(SectionRow::Blank);
         }
         rows.push(SectionRow::SubSectionHeader("Hooks".to_string()));
-        self.add_input_to_rows("Focus", &config.focus, &mut rows, item_idx);
-        self.add_input_to_rows("Short Break", &config.short, &mut rows, item_idx);
-        self.add_input_to_rows("Long Break", &config.long, &mut rows, item_idx);
+        self.add_input_to_rows(model, "Focus", &config.focus, &mut rows, item_idx);
+        self.add_input_to_rows(model, "Short Break", &config.short, &mut rows, item_idx);
+        self.add_input_to_rows(model, "Long Break", &config.long, &mut rows, item_idx);
 
         let height = 2 + rows.iter().map(|r| r.height()).sum::<u16>();
         sections.push(Section {
@@ -340,6 +231,7 @@ impl TuiSettingsRenderer {
 
     fn build_alarm_section(
         &self,
+        model: &SettingsModel,
         config: &Alarms,
         sections: &mut Vec<Section>,
         item_idx: &mut u32,
@@ -349,18 +241,21 @@ impl TuiSettingsRenderer {
         // Alarm Files subsection
         rows.push(SectionRow::SubSectionHeader("Alarm Files".to_string()));
         self.add_input_to_rows(
+            model,
             "Focus",
             get_alarm_path_value(&config.focus),
             &mut rows,
             item_idx,
         );
         self.add_input_to_rows(
+            model,
             "Short Break",
             get_alarm_path_value(&config.short),
             &mut rows,
             item_idx,
         );
         self.add_input_to_rows(
+            model,
             "Long Break",
             get_alarm_path_value(&config.long),
             &mut rows,
@@ -371,18 +266,21 @@ impl TuiSettingsRenderer {
         rows.push(SectionRow::Blank);
         rows.push(SectionRow::SubSectionHeader("Alarm Volumes".to_string()));
         self.add_input_to_rows(
+            model,
             "Focus",
             get_alarm_volume_value(&config.focus),
             &mut rows,
             item_idx,
         );
         self.add_input_to_rows(
+            model,
             "Short Break",
             get_alarm_volume_value(&config.short),
             &mut rows,
             item_idx,
         );
         self.add_input_to_rows(
+            model,
             "Long Break",
             get_alarm_volume_value(&config.long),
             &mut rows,
@@ -400,6 +298,7 @@ impl TuiSettingsRenderer {
 
     fn add_input_to_rows(
         &self,
+        model: &SettingsModel,
         label: impl ToString,
         value: impl ToString,
         rows: &mut Vec<SectionRow>,
@@ -407,16 +306,16 @@ impl TuiSettingsRenderer {
     ) {
         let idx = *item_idx;
         *item_idx += 1;
-        let is_selected = self.selected_idx == idx;
         rows.push(SectionRow::Input {
             label: label.to_string(),
             value: value.to_string(),
-            is_selected,
+            is_selected: model.selected_idx() == idx,
         });
     }
 
     fn add_checkbox_to_rows(
         &self,
+        model: &SettingsModel,
         label: &str,
         value: bool,
         rows: &mut Vec<SectionRow>,
@@ -424,11 +323,10 @@ impl TuiSettingsRenderer {
     ) {
         let idx = *item_idx;
         *item_idx += 1;
-        let is_selected = self.selected_idx == idx;
         rows.push(SectionRow::Checkbox {
             label: label.to_string(),
             value,
-            is_selected,
+            is_selected: model.selected_idx() == idx,
         });
     }
 }
@@ -616,3 +514,25 @@ fn get_alarm_path_value(alarm: &Alarm) -> String {
 fn get_alarm_volume_value(alarm: &Alarm) -> String {
     alarm.volume.to_string()
 }
+
+static TITLE: LazyLock<BigText<'static>> = LazyLock::new(|| {
+    BigText::builder()
+        .pixel_size(PixelSize::Quadrant)
+        .style(
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        )
+        .lines(vec!["Settings".into()])
+        .centered()
+        .build()
+});
+
+static SAVED_INDICATOR: LazyLock<Paragraph<'static>> = LazyLock::new(|| {
+    Paragraph::new(Line::from(vec![Span::styled(
+        "● Unsaved changes",
+        Style::default()
+            .fg(Color::Yellow)
+            .add_modifier(Modifier::BOLD),
+    )]))
+});

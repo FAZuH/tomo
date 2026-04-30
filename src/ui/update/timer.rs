@@ -4,7 +4,7 @@ use crate::models::Pomodoro;
 use crate::ui::Updateable;
 
 #[derive(Clone, Debug, Copy, PartialEq, Eq)]
-pub enum TimerMsg {
+pub enum PomodoroMsg {
     Add(Duration),
     Subtract(Duration),
     TogglePause,
@@ -15,7 +15,7 @@ pub enum TimerMsg {
 }
 
 #[derive(Clone, Debug, Copy, PartialEq, Eq)]
-pub enum TimerCmd {
+pub enum PomodoroCmd {
     None,
     PromptNextSession,
     NextSession,
@@ -23,12 +23,12 @@ pub enum TimerCmd {
 }
 
 impl Updateable for Pomodoro {
-    type Msg = TimerMsg;
-    type Cmd = TimerCmd;
+    type Msg = PomodoroMsg;
+    type Cmd = PomodoroCmd;
 
     fn update(&mut self, msg: Self::Msg) -> Self::Cmd {
-        use TimerMsg::*;
-        let mut cmd = TimerCmd::None;
+        use PomodoroMsg::*;
+        let mut cmd = PomodoroCmd::None;
         match msg {
             Add(dur) => self.add(dur),
             Subtract(dur) => self.subtract(dur),
@@ -37,7 +37,7 @@ impl Updateable for Pomodoro {
             ResetSession => self.reset(),
             NextState => {
                 self.skip();
-                cmd = TimerCmd::SessionContinued;
+                cmd = PomodoroCmd::SessionContinued;
             }
             Tick { auto_next } => cmd = self.tick(auto_next),
         }
@@ -46,15 +46,15 @@ impl Updateable for Pomodoro {
 }
 
 impl Pomodoro {
-    pub fn tick(&mut self, auto_next: bool) -> TimerCmd {
+    pub fn tick(&mut self, auto_next: bool) -> PomodoroCmd {
         if self.remaining_time().is_zero() {
             if auto_next {
-                TimerCmd::NextSession
+                PomodoroCmd::NextSession
             } else {
-                TimerCmd::PromptNextSession
+                PomodoroCmd::PromptNextSession
             }
         } else {
-            TimerCmd::None
+            PomodoroCmd::None
         }
     }
 }

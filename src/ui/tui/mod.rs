@@ -1,7 +1,8 @@
 pub mod backend;
-pub mod view;
+pub mod model;
 pub mod runner;
 pub mod toasts;
+pub mod view;
 
 pub use runner::TuiRunner;
 

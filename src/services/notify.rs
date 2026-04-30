@@ -1,14 +1,14 @@
 use notify_rust::Notification;
 use notify_rust::{self};
 
-use crate::models::pomodoro::State;
+use crate::models::pomodoro::Mode;
 
-impl From<State> for Notification {
-    fn from(value: State) -> Self {
+impl From<Mode> for Notification {
+    fn from(value: Mode) -> Self {
         let (summary, body) = match value {
-            State::Focus => ("Time to focus!", "Your break is over. Get back to work."),
-            State::LongBreak => ("Long break time!", "You've earned it. Take a long break."),
-            State::ShortBreak => ("Short break time!", "Take a quick breather."),
+            Mode::Focus => ("Time to focus!", "Your break is over. Get back to work."),
+            Mode::LongBreak => ("Long break time!", "You've earned it. Take a long break."),
+            Mode::ShortBreak => ("Short break time!", "Take a quick breather."),
         };
 
         let mut ret = Notification::new();

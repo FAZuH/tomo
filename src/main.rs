@@ -5,7 +5,6 @@ use tomo::error::AppError;
 use tomo::log::setup_logging;
 use tomo::models::Pomodoro;
 use tomo::services::alarm::AlarmService;
-use tomo::ui::AppModel;
 use tomo::ui::Runner;
 use tomo::ui::tui::TuiRunner;
 
@@ -15,23 +14,18 @@ async fn main() -> Result<(), AppError> {
     let conf = Config::load()?;
     setup_logging(&conf.logs_path)?;
 
-    let mut pomodoro = pomodoro(&cli, &conf);
-    pomodoro.start().unwrap();
+    let mut pomo = pomodoro(&cli, &conf);
+    pomo.start().unwrap();
 
-    let model = AppModel {
-        timer: pomodoro,
-        settings: conf,
-    };
-
-    let mut view = runner(model);
+    let mut view = runner(conf, pomo);
     view.run().unwrap();
 
     Ok(())
 }
 
-fn runner<'b>(model: AppModel) -> impl Runner + 'b {
-    let sound = Box::new(AlarmService::new(model.settings.pomodoro.alarm.clone()));
-    TuiRunner::new(model, sound).unwrap()
+fn runner<'b>(conf: Config, pomo: Pomodoro) -> impl Runner + 'b {
+    let sound = Box::new(AlarmService::new(conf.pomodoro.alarm.clone()));
+    TuiRunner::new(pomo, conf, sound).unwrap()
 }
 
 fn pomodoro(cli: &Cli, conf: &Config) -> Pomodoro {

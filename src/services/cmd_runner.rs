@@ -1,11 +1,11 @@
 use crate::config::pomodoro::Hooks;
-use crate::models::pomodoro::State;
+use crate::models::pomodoro::Mode;
 
-pub fn run_cmds(conf: &Hooks, state: State) {
+pub fn run_cmds(conf: &Hooks, state: Mode) {
     let cmd = match state {
-        State::Focus => conf.focus.clone(),
-        State::LongBreak => conf.long.clone(),
-        State::ShortBreak => conf.short.clone(),
+        Mode::Focus => conf.focus.clone(),
+        Mode::LongBreak => conf.long.clone(),
+        Mode::ShortBreak => conf.short.clone(),
     };
 
     std::thread::spawn(move || {

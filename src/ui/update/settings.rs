@@ -8,7 +8,7 @@ use crate::ui::Updateable;
 pub const SETTINGS_VIEW_ITEMS: u32 = 16;
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum SettingsMsg {
+pub enum ConfigMsg {
     // Timer settings
     TimerFocus(Duration),
     TimerShort(Duration),
@@ -32,27 +32,27 @@ pub enum SettingsMsg {
     AlarmVolumeLong(Percentage),
 }
 
-impl SettingsMsg {
+impl ConfigMsg {
     pub fn is_toggle_index(index: u32) -> bool {
         (4..=6).contains(&index)
     }
 }
 
-#[derive(Debug)]
-pub enum SettingsCmd {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConfigCmd {
     None,
 }
 
 impl Updateable for Config {
-    type Msg = SettingsMsg;
-    type Cmd = SettingsCmd;
+    type Msg = ConfigMsg;
+    type Cmd = ConfigCmd;
 
     fn update(&mut self, msg: Self::Msg) -> Self::Cmd {
-        use SettingsMsg::*;
+        use ConfigMsg::*;
         let timer = &mut self.pomodoro.timer;
         let hook = &mut self.pomodoro.hook;
         let alarm = &mut self.pomodoro.alarm;
-        let cmd = SettingsCmd::None;
+        let cmd = ConfigCmd::None;
         match msg {
             // Timer
             TimerFocus(d) => timer.focus = d,

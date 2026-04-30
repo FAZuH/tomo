@@ -86,3 +86,16 @@ pub struct Alarm {
     pub path: Option<PathBuf>,
     pub volume: crate::config::Percentage,
 }
+
+impl Alarm {
+    pub fn volume(&self) -> String {
+        self.volume.to_string()
+    }
+
+    pub fn path(&self) -> String {
+        self.path
+            .as_ref()
+            .map(|p| p.display().to_string())
+            .unwrap_or_default()
+    }
+}

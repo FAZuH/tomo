@@ -1,6 +1,6 @@
 pub mod settings;
 pub mod timer;
-pub use settings::SettingsCmd;
-pub use settings::SettingsMsg;
-pub use timer::TimerCmd;
-pub use timer::TimerMsg;
+pub use settings::ConfigCmd;
+pub use settings::ConfigMsg;
+pub use timer::PomodoroCmd;
+pub use timer::PomodoroMsg;
