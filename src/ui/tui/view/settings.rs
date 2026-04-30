@@ -53,14 +53,18 @@ impl<'a> StatefulViewRef<Canvas<'a, '_>> for TuiSettingsView {
         let buf = canvas.buffer_mut();
         let SettingsState { model, conf } = state;
 
+        // Split area for scroll view and help bar
+        let [content_area, help_area] =
+            Layout::vertical([Constraint::Fill(1), Constraint::Length(3)]).areas(area);
+
         // Reserve space for scrollbar and padding
-        let content_width = area.width.saturating_sub(2).max(46);
+        let content_width = content_area.width.saturating_sub(2).max(46);
 
         // Build sections with proper layout
         let sections = self.build_sections(model, &conf.pomodoro);
 
         // Create scroll view with full content size
-        let mut scroll_view = ScrollView::new(Size::new(content_width, area.height))
+        let mut scroll_view = ScrollView::new(Size::new(content_width, content_area.height))
             .vertical_scrollbar_visibility(ScrollbarVisibility::Automatic);
 
         // Render unsaved changes indicator in the spacing row between title and sections
@@ -72,7 +76,7 @@ impl<'a> StatefulViewRef<Canvas<'a, '_>> for TuiSettingsView {
         let last = sections.last().unwrap().section;
         for section in sections {
             let section_area = if section.section == last {
-                Rect::new(0, y, content_width, area.height)
+                Rect::new(0, y, content_width, content_area.height)
             } else {
                 Rect::new(0, y, content_width, section.height)
             };
@@ -80,9 +84,12 @@ impl<'a> StatefulViewRef<Canvas<'a, '_>> for TuiSettingsView {
             scroll_view.render_widget(section, section_area);
         }
 
-        scroll_view.render(area, buf, model.scroll_state_mut());
+        scroll_view.render(content_area, buf, model.scroll_state_mut());
 
-        // Render prompt popup
+        // Render help bar at bottom
+        self.shortcuts(help_area, buf, model);
+
+        // Render prompt popup (over full area, including help bar)
         self.prompt(canvas, area, model);
     }
 }
@@ -91,6 +98,14 @@ impl TuiSettingsView {
     fn save_indicator(&self, scroll: &mut ScrollView, area: Rect, model: &mut SettingsModel) {
         if model.has_unsaved_changes() {
             scroll.render_widget(SAVED_INDICATOR.clone(), area);
+        }
+    }
+
+    fn shortcuts(&self, area: Rect, buf: &mut Buffer, model: &SettingsModel) {
+        if model.show_shortcuts() {
+            SHORTCUTS.clone().render(area, buf);
+        } else {
+            SHORTCUT_HINT.clone().render(area, buf);
         }
     }
 
@@ -430,6 +445,51 @@ pub struct SettingsPrompt {
     pub text_state: TextState<'static>,
     pub label: String,
 }
+
+static SHORTCUTS: LazyLock<Paragraph<'static>> = LazyLock::new(|| {
+    let dim = Style::default().dim();
+    let bright = Style::default();
+    let sep = Span::styled(" • ", dim);
+    Paragraph::new(vec![
+        Line::from(vec![
+            Span::styled("↑/↓/j/k", bright),
+            Span::styled(": Navigate", dim),
+            sep.clone(),
+            Span::styled("Tab", bright),
+            Span::styled(": Sections", dim),
+            sep.clone(),
+            Span::styled("1/2/3", bright),
+            Span::styled(": Jump", dim),
+        ]),
+        Line::from(vec![
+            Span::styled("Space/Enter", bright),
+            Span::styled(": Toggle", dim),
+            sep.clone(),
+            Span::styled("Enter", bright),
+            Span::styled(": Edit", dim),
+            sep.clone(),
+            Span::styled("s", bright),
+            Span::styled(": Save", dim),
+            sep.clone(),
+            Span::styled("Esc", bright),
+            Span::styled(": Back", dim),
+            sep.clone(),
+            Span::styled("q", bright),
+            Span::styled(": Quit", dim),
+            sep.clone(),
+            Span::styled("?", bright),
+            Span::styled(": Disable Help", dim),
+        ]),
+    ])
+    .alignment(Alignment::Center)
+});
+
+static SHORTCUT_HINT: LazyLock<Paragraph<'static>> = LazyLock::new(|| {
+    let dim = Style::default().dim();
+    let bright = Style::default();
+    let line = Line::from(vec![Span::styled("?", bright), Span::styled(": Help", dim)]);
+    Paragraph::new(line).alignment(Alignment::Center)
+});
 
 static SAVED_INDICATOR: LazyLock<Paragraph<'static>> = LazyLock::new(|| {
     Paragraph::new(Line::from(vec![Span::styled(

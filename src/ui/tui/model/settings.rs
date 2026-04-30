@@ -244,6 +244,7 @@ pub struct SettingsModel {
     scroll_state: ScrollViewState,
     prompt: Option<SettingsPrompt>,
     has_unsaved_changes: bool,
+    show_shortcuts: bool,
 }
 
 impl Updateable for SettingsModel {
@@ -282,6 +283,7 @@ impl SettingsModel {
             scroll_state: ScrollViewState::default(),
             prompt: None,
             has_unsaved_changes: false,
+            show_shortcuts: false,
         }
     }
 
@@ -313,6 +315,14 @@ impl SettingsModel {
     /// Check if currently editing
     pub fn is_editing(&self) -> bool {
         self.prompt.is_some()
+    }
+
+    pub fn show_shortcuts(&self) -> bool {
+        self.show_shortcuts
+    }
+
+    pub fn toggle_shortcuts(&mut self) {
+        self.show_shortcuts = !self.show_shortcuts;
     }
 
     pub fn start_editing_for_field(&mut self, config: &PomodoroConfig) {

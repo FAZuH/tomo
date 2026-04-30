@@ -303,6 +303,7 @@ impl TuiRunner {
                 Char(' ') if self.settings().selected().is_toggle() => self.apply_settings_edit(),
                 Esc => self.router_mut().navigate(Page::Timer),
                 Char('q') => self.quit(),
+                Char('/') | Char('?') => self.settings_mut().toggle_shortcuts(),
                 _ => {}
             },
             Event::Mouse(mouse) => match mouse.kind {
