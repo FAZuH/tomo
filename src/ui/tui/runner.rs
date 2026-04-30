@@ -25,6 +25,7 @@ use crate::services::cmd_runner::run_cmds;
 use crate::services::notify::notify;
 use crate::ui::tui::TuiError;
 use crate::ui::tui::backend::Tui;
+use crate::ui::tui::model::SettingsItem;
 use crate::ui::tui::model::SettingsModel;
 use crate::ui::tui::model::SettingsMsg;
 use crate::ui::tui::model::TimerModel;
@@ -270,7 +271,7 @@ impl TuiRunner {
                     let _ = self.update_settings(SelectDown);
                 }
                 Enter => {
-                    if ConfigMsg::is_toggle_index(self.settings_mut().selected_idx()) {
+                    if self.settings_mut().selected().is_toggle() {
                         self.apply_settings_edit()
                     } else {
                         let pomo = &self.conf().pomodoro.clone();
@@ -278,9 +279,7 @@ impl TuiRunner {
                     }
                 }
                 Char('s') => self.save_settings(),
-                Char(' ') if ConfigMsg::is_toggle_index(self.settings().selected_idx()) => {
-                    self.apply_settings_edit()
-                }
+                Char(' ') if self.settings().selected().is_toggle() => self.apply_settings_edit(),
                 Esc => self.router_mut().navigate(Page::Timer),
                 Char('q') => self.quit(),
                 _ => {}
@@ -317,11 +316,11 @@ impl TuiRunner {
     }
 
     fn apply_settings_edit(&mut self) {
-        let selected_idx = self.settings().selected_idx();
+        let selected = self.settings().selected();
         let value = self.settings_mut().take_edit_value();
         self.update_settings(SettingsMsg::CancelEditing);
 
-        let msg = match self.msg_from_edit(value, selected_idx) {
+        let msg = match self.msg_from_edit(value, selected) {
             Some(msg) => msg,
             None => return,
         };
@@ -331,30 +330,28 @@ impl TuiRunner {
         self.update_settings(SettingsMsg::SetUnsavedChanges(is_unsaved));
     }
 
-    fn msg_from_edit(&mut self, value: String, selected_idx: u32) -> Option<ConfigMsg> {
+    fn msg_from_edit(&mut self, value: String, selected: SettingsItem) -> Option<ConfigMsg> {
         use ConfigMsg::*;
-        let msg = match selected_idx {
-            // Timer settings (0-6)
-            0 => TimerFocus(self.parse_dur(value)?),
-            1 => TimerShort(self.parse_dur(value)?),
-            2 => TimerLong(self.parse_dur(value)?),
-            3 => TimerLongInterval(self.try_parse(value, |s| s.parse::<u32>(), "integer")?),
-            4 => TimerAutoFocus,
-            5 => TimerAutoShort,
-            6 => TimerAutoLong,
-            // Hook settings (7-9)
-            7 => HookFocus(value),
-            8 => HookShort(value),
-            9 => HookLong(value),
-            // Alarm path settings (10-12)
-            10 => AlarmPathFocus(self.parse_path(value)),
-            11 => AlarmPathShort(self.parse_path(value)),
-            12 => AlarmPathLong(self.parse_path(value)),
-            // Alarm volume settings (10-12)
-            13 => AlarmVolumeFocus(self.parse_vol(value)?),
-            14 => AlarmVolumeShort(self.parse_vol(value)?),
-            15 => AlarmVolumeLong(self.parse_vol(value)?),
-            _ => return None,
+        use SettingsItem as I;
+        let msg = match selected {
+            I::TimerFocus => TimerFocus(self.parse_dur(value)?),
+            I::TimerShort => TimerShort(self.parse_dur(value)?),
+            I::TimerLong => TimerLong(self.parse_dur(value)?),
+            I::TimerLongInterval => {
+                TimerLongInterval(self.try_parse(value, |s| s.parse::<u32>(), "integer")?)
+            }
+            I::TimerAutoFocus => TimerAutoFocus,
+            I::TimerAutoShort => TimerAutoShort,
+            I::TimerAutoLong => TimerAutoLong,
+            I::HookFocus => HookFocus(value),
+            I::HookShort => HookShort(value),
+            I::HookLong => HookLong(value),
+            I::AlarmPathFocus => AlarmPathFocus(self.parse_path(value)),
+            I::AlarmPathShort => AlarmPathShort(self.parse_path(value)),
+            I::AlarmPathLong => AlarmPathLong(self.parse_path(value)),
+            I::AlarmVolumeFocus => AlarmVolumeFocus(self.parse_vol(value)?),
+            I::AlarmVolumeShort => AlarmVolumeShort(self.parse_vol(value)?),
+            I::AlarmVolumeLong => AlarmVolumeLong(self.parse_vol(value)?),
         };
         Some(msg)
     }

@@ -19,7 +19,9 @@ use crate::config::pomodoro::Hooks;
 use crate::config::pomodoro::PomodoroConfig;
 use crate::config::pomodoro::Timers;
 use crate::ui::StatefulViewRef;
+use crate::ui::tui::model::SettingsItem;
 use crate::ui::tui::model::SettingsModel;
+use crate::ui::tui::model::SettingsSection;
 use crate::ui::tui::view::Canvas;
 
 type State = SettingsState;
@@ -129,75 +131,63 @@ impl TuiSettingsView {
     /// Build sections from config, calculating layout and identifying editable items
     fn build_sections(&self, model: &SettingsModel, config: &PomodoroConfig) -> Vec<Section> {
         let mut sections = Vec::new();
-        let mut item_idx = 0u32;
 
-        self.build_timer_section(model, &config.timer, &mut sections, &mut item_idx);
-        self.build_hooks_section(model, &config.hook, &mut sections, &mut item_idx);
-        self.build_alarm_section(model, &config.alarm, &mut sections, &mut item_idx);
+        self.build_timer_section(model, &config.timer, &mut sections);
+        self.build_hooks_section(model, &config.hook, &mut sections);
+        self.build_alarm_section(model, &config.alarm, &mut sections);
 
         sections
     }
 
-    fn build_timer_section(
-        &self,
-        model: &SettingsModel,
-        conf: &Timers,
-        sections: &mut Vec<Section>,
-        i: &mut u32,
-    ) {
+    fn build_timer_section(&self, m: &SettingsModel, conf: &Timers, sections: &mut Vec<Section>) {
+        use SettingsItem::*;
         // Build Pomodoro Timer section
         let label = "󰔛 Pomodoro Timer";
-        let color = SectionColor::from_label(label);
         let mut r = Vec::new();
 
         // Durations subsection
         if !r.is_empty() {
             r.push(SectionRow::Blank);
         }
-        r.push(SectionRow::SubSectionHeader("Durations".to_string()));
+        r.push(SectionRow::SubSectionHeader("Durations".into()));
         self.add_inpt(
-            model,
-            "Focus",
+            m,
+            TimerFocus,
             format!("{}", conf.focus.as_secs() / 60),
             &mut r,
-            i,
         );
         self.add_inpt(
-            model,
-            "Short Break",
+            m,
+            TimerShort,
             format!("{}", conf.short.as_secs() / 60),
             &mut r,
-            i,
         );
         self.add_inpt(
-            model,
-            "Long Break",
+            m,
+            TimerLong,
             format!("{}", conf.long.as_secs() / 60),
             &mut r,
-            i,
         );
-
         self.add_inpt(
-            model,
-            "Long Break Interval",
+            m,
+            TimerLongInterval,
             format!("{}", conf.long_interval),
             &mut r,
-            i,
         );
 
         // Auto Start subsection
         if !r.is_empty() {
             r.push(SectionRow::Blank);
         }
-        r.push(SectionRow::SubSectionHeader("Auto Start".to_string()));
-        self.add_box(model, "Focus", conf.auto_focus, &mut r, i);
-        self.add_box(model, "Short Break", conf.auto_short, &mut r, i);
-        self.add_box(model, "Long Break", conf.auto_long, &mut r, i);
+        r.push(SectionRow::SubSectionHeader("Auto Start".into()));
+        self.add_box(m, TimerAutoFocus, conf.auto_focus, &mut r);
+        self.add_box(m, TimerAutoShort, conf.auto_short, &mut r);
+        self.add_box(m, TimerAutoLong, conf.auto_long, &mut r);
 
         let height = 2 + r.iter().map(|r| r.height()).sum::<u16>();
         sections.push(Section {
-            title: label.to_string(),
-            color,
+            title: label.into(),
+            color: SettingsSection::Timer,
             height,
             rows: r,
         });
@@ -208,26 +198,25 @@ impl TuiSettingsView {
         model: &SettingsModel,
         conf: &Hooks,
         sections: &mut Vec<Section>,
-        i: &mut u32,
     ) {
+        use SettingsItem::*;
         // Build Command Hooks section
         let label = "󰛢 Command Hooks";
-        let color = SectionColor::from_label(label);
         let mut r = Vec::new();
 
         // Hooks subsection
         if !r.is_empty() {
             r.push(SectionRow::Blank);
         }
-        r.push(SectionRow::SubSectionHeader("Hooks".to_string()));
-        self.add_inpt(model, "Focus", &conf.focus, &mut r, i);
-        self.add_inpt(model, "Short Break", &conf.short, &mut r, i);
-        self.add_inpt(model, "Long Break", &conf.long, &mut r, i);
+        r.push(SectionRow::SubSectionHeader("Hooks".into()));
+        self.add_inpt(model, HookFocus, &conf.focus, &mut r);
+        self.add_inpt(model, HookShort, &conf.short, &mut r);
+        self.add_inpt(model, HookLong, &conf.long, &mut r);
 
         let height = 2 + r.iter().map(|r| r.height()).sum::<u16>();
         sections.push(Section {
-            title: label.to_string(),
-            color,
+            title: label.into(),
+            color: SettingsSection::Hook,
             height,
             rows: r,
         });
@@ -238,27 +227,27 @@ impl TuiSettingsView {
         model: &SettingsModel,
         conf: &Alarms,
         sections: &mut Vec<Section>,
-        i: &mut u32,
     ) {
+        use SettingsItem::*;
         let mut r = Vec::new();
 
         // Alarm Files subsection
-        r.push(SectionRow::SubSectionHeader("Alarm Files".to_string()));
-        self.add_inpt(model, "Focus", conf.focus.path(), &mut r, i);
-        self.add_inpt(model, "Short Break", conf.short.path(), &mut r, i);
-        self.add_inpt(model, "Long Break", conf.long.path(), &mut r, i);
+        r.push(SectionRow::SubSectionHeader("Alarm Files".into()));
+        self.add_inpt(model, AlarmPathFocus, conf.focus.path(), &mut r);
+        self.add_inpt(model, AlarmPathShort, conf.short.path(), &mut r);
+        self.add_inpt(model, AlarmPathLong, conf.long.path(), &mut r);
 
         // Alarm Volumes subsection
         r.push(SectionRow::Blank);
-        r.push(SectionRow::SubSectionHeader("Alarm Volumes".to_string()));
-        self.add_inpt(model, "Focus", conf.focus.volume(), &mut r, i);
-        self.add_inpt(model, "Short Break", conf.short.volume(), &mut r, i);
-        self.add_inpt(model, "Long Break", conf.long.volume(), &mut r, i);
+        r.push(SectionRow::SubSectionHeader("Alarm Volumes".into()));
+        self.add_inpt(model, AlarmVolumeFocus, conf.focus.volume(), &mut r);
+        self.add_inpt(model, AlarmVolumeShort, conf.short.volume(), &mut r);
+        self.add_inpt(model, AlarmVolumeLong, conf.long.volume(), &mut r);
 
         let height = 2 + r.iter().map(|r| r.height()).sum::<u16>();
         sections.push(Section {
-            title: "󰕾 Alarm".to_string(),
-            color: SectionColor::Alarm,
+            title: "󰕾 Alarm".into(),
+            color: SettingsSection::Alarm,
             height,
             rows: r,
         });
@@ -267,34 +256,28 @@ impl TuiSettingsView {
     fn add_inpt(
         &self,
         model: &SettingsModel,
-        label: impl ToString,
+        item: SettingsItem,
         value: impl ToString,
         rows: &mut Vec<SectionRow>,
-        item_idx: &mut u32,
     ) {
-        let idx = *item_idx;
-        *item_idx += 1;
         rows.push(SectionRow::Input {
-            label: label.to_string(),
+            label: item.label().into(),
             value: value.to_string(),
-            is_selected: model.selected_idx() == idx,
+            is_selected: model.selected() == item,
         });
     }
 
     fn add_box(
         &self,
         model: &SettingsModel,
-        label: &str,
+        item: SettingsItem,
         value: bool,
         rows: &mut Vec<SectionRow>,
-        item_idx: &mut u32,
     ) {
-        let idx = *item_idx;
-        *item_idx += 1;
         rows.push(SectionRow::Checkbox {
-            label: label.to_string(),
+            label: item.label().into(),
             value,
-            is_selected: model.selected_idx() == idx,
+            is_selected: model.selected() == item,
         });
     }
 }
@@ -303,7 +286,7 @@ impl TuiSettingsView {
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct Section {
     title: String,
-    color: SectionColor,
+    color: SettingsSection,
     height: u16,
     rows: Vec<SectionRow>,
 }
@@ -429,20 +412,12 @@ impl Widget for SectionRow {
     }
 }
 
-/// Section color scheme for visual distinction
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum SectionColor {
-    Timer,
-    Hooks,
-    Alarm,
-}
-
-impl SectionColor {
+impl SettingsSection {
     fn border_color(self) -> Color {
         match self {
-            SectionColor::Timer => Color::Cyan,
-            SectionColor::Hooks => Color::Yellow,
-            SectionColor::Alarm => Color::Magenta,
+            SettingsSection::Timer => Color::Cyan,
+            SettingsSection::Hook => Color::Yellow,
+            SettingsSection::Alarm => Color::Magenta,
         }
     }
 
@@ -450,19 +425,6 @@ impl SectionColor {
         Style::default()
             .fg(self.border_color())
             .add_modifier(Modifier::BOLD)
-    }
-
-    fn from_label(label: impl AsRef<str>) -> Self {
-        let label = label.as_ref();
-        if label.contains("Timer") {
-            SectionColor::Timer
-        } else if label.contains("Hook") {
-            SectionColor::Hooks
-        } else if label.contains("Alarm") {
-            SectionColor::Alarm
-        } else {
-            SectionColor::Timer
-        }
     }
 }
 

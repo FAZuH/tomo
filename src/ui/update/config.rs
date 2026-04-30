@@ -32,12 +32,6 @@ pub enum ConfigMsg {
     AlarmVolumeLong(Percentage),
 }
 
-impl ConfigMsg {
-    pub fn is_toggle_index(index: u32) -> bool {
-        (4..=6).contains(&index)
-    }
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConfigCmd {
     None,
