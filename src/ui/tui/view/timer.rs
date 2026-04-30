@@ -67,7 +67,7 @@ impl StatefulWidget for TuiTimerRenderer {
 impl TuiTimerRenderer {
     // Render popup if prompt is active
     fn prompt(&self, area: Rect, buf: Buf, model: &TimerModel, pomo: &Pomodoro) {
-        if model.prompt_next_session() {
+        if model.prompt_transition() {
             let next = pomo.next_mode().to_string().to_lowercase();
             let body = Text::from(vec![
                 Line::from(""),

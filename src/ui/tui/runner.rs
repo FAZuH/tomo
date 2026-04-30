@@ -117,7 +117,7 @@ impl TuiRunner {
         match cmd {
             PomodoroCmd::None => {}
             PomodoroCmd::PromptNextSession => {
-                if !self.timer().prompt_next_session() {
+                if !self.timer().prompt_transition() {
                     // only runs on once per session
                     self.on_session_end();
                 }
@@ -125,7 +125,7 @@ impl TuiRunner {
             }
             PomodoroCmd::NextSession => {
                 self.on_session_end();
-                self.next_session();
+                self.transition();
             }
             PomodoroCmd::SessionContinued => {}
         }
@@ -164,7 +164,7 @@ impl TuiRunner {
         );
     }
 
-    fn next_session(&mut self) {
+    fn transition(&mut self) {
         self.update_pomo(PomodoroMsg::NextState);
     }
 
@@ -201,8 +201,8 @@ impl TuiRunner {
         use KeyCode::*;
         use PomodoroMsg::*;
 
-        if self.timer().prompt_next_session() {
-            return self.handle_timer_nextstate_prompt(event);
+        if self.timer().prompt_transition() {
+            return self.handle_timer_transition(event);
         }
 
         if let Event::Key(key) = event {
@@ -235,11 +235,11 @@ impl TuiRunner {
         }
     }
 
-    fn handle_timer_nextstate_prompt(&mut self, event: Event) {
+    fn handle_timer_transition(&mut self, event: Event) {
         if let Event::Key(key) = event {
             match key.code {
                 KeyCode::Enter | KeyCode::Char('y') => {
-                    self.next_session();
+                    self.transition();
                     self.update_timer(TimerMsg::SetPromptNextSession(false));
                 }
                 KeyCode::Esc | KeyCode::Char('n') => self.quit(),

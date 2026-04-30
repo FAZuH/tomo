@@ -12,7 +12,7 @@ pub enum TimerCmd {
 
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct TimerModel {
-    prompt_next_session: bool,
+    prompt_transition: bool,
 }
 
 impl Updateable for TimerModel {
@@ -22,7 +22,7 @@ impl Updateable for TimerModel {
     fn update(&mut self, msg: Self::Msg) -> Self::Cmd {
         use TimerMsg::*;
         match msg {
-            SetPromptNextSession(v) => self.prompt_next_session = v,
+            SetPromptNextSession(v) => self.prompt_transition = v,
         }
         TimerCmd::None
     }
@@ -33,7 +33,7 @@ impl TimerModel {
         Self::default()
     }
 
-    pub fn prompt_next_session(&self) -> bool {
-        self.prompt_next_session
+    pub fn prompt_transition(&self) -> bool {
+        self.prompt_transition
     }
 }
