@@ -11,7 +11,7 @@ use tui_widgets::popup::Popup;
 
 use crate::models::Pomodoro;
 use crate::models::pomodoro::Mode;
-use crate::ui::StatefulView;
+use crate::ui::StatefulViewRef;
 use crate::ui::tui::model::TimerModel;
 use crate::utils;
 
@@ -38,11 +38,11 @@ impl TimerState {
     }
 }
 
-impl StatefulView<Canvas<'_>> for TuiTimerView {
+impl StatefulViewRef<Canvas<'_>> for TuiTimerView {
     type State = State;
     type Result = ();
 
-    fn render_stateful(&self, canvas: Canvas, state: &mut Self::State) -> Self::Result {
+    fn render_stateful_ref(&self, canvas: Canvas, state: &mut Self::State) -> Self::Result {
         let (area, buf) = canvas;
         let TimerState { model, pomo } = state;
 

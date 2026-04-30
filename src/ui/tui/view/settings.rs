@@ -18,7 +18,7 @@ use crate::config::pomodoro::Alarms;
 use crate::config::pomodoro::Hooks;
 use crate::config::pomodoro::PomodoroConfig;
 use crate::config::pomodoro::Timers;
-use crate::ui::StatefulView;
+use crate::ui::StatefulViewRef;
 use crate::ui::tui::model::SettingsModel;
 
 type Canvas<'a, 'b> = &'a mut Frame<'b>;
@@ -43,11 +43,11 @@ impl TuiSettingsView {
     }
 }
 
-impl<'a> StatefulView<Canvas<'a, '_>> for TuiSettingsView {
+impl<'a> StatefulViewRef<Canvas<'a, '_>> for TuiSettingsView {
     type State = State;
     type Result = ();
 
-    fn render_stateful(&self, canvas: Canvas<'a, '_>, state: &mut State) {
+    fn render_stateful_ref(&self, canvas: Canvas<'a, '_>, state: &mut State) {
         let area = canvas.area();
         let buf = canvas.buffer_mut();
         let SettingsState { model, conf } = state;

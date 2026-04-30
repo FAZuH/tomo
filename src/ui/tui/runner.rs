@@ -165,7 +165,7 @@ impl TuiRunner {
 
     fn render_terminal(&mut self) -> Result<(), TuiError> {
         self.terminal.draw(|f| {
-            TuiView::new().render_stateful(f, &mut self.state);
+            TuiView::new().render_stateful_ref(f, &mut self.state);
         })?;
         Ok(())
     }

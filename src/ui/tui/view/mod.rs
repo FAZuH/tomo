@@ -18,7 +18,7 @@ use crate::ui::ConfigCmd;
 use crate::ui::ConfigMsg;
 use crate::ui::PomodoroCmd;
 use crate::ui::PomodoroMsg;
-use crate::ui::StatefulView;
+use crate::ui::StatefulViewRef;
 use crate::ui::Updateable as _;
 use crate::ui::router::Page;
 use crate::ui::router::Router;
@@ -52,11 +52,11 @@ impl TuiView {
         );
     }
 }
-impl<'a> StatefulView<Canvas<'a, '_>> for TuiView {
+impl<'a> StatefulViewRef<Canvas<'a, '_>> for TuiView {
     type State = State;
     type Result = ();
 
-    fn render_stateful(&self, canvas: Canvas<'a, '_>, state: &mut State) {
+    fn render_stateful_ref(&self, canvas: Canvas<'a, '_>, state: &mut State) {
         let area = canvas.area();
         let buf = canvas.buffer_mut();
         match state.router.active_page() {
