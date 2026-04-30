@@ -1,83 +1,99 @@
 sequenceDiagram
     autonumber
     participant U as User
-    participant V as TuiView
+    participant R as TuiRunner
     participant TH as TickHandler
-    participant TU as TimerUpdate
-    participant SU as SettingsUpdate
-    participant TR as TuiRenderer
+    participant P as Pomodoro
+    participant C as Config
+    participant V as TuiView
     participant T as ToastHandler
     participant S as SoundService
 
     rect rgb(180, 200, 220)
-        note right of V: INITIALIZATION
-        V->>V: Router::new(Page::Timer)
-        V->>TR: TuiRenderer::new()
-        activate TR
-        TR-->>V: renderer
-        deactivate TR
-        V->>V: snapshot_settings(&model)
+        note right of R: INITIALIZATION
+        R->>R: Router::new(Page::Timer)
+        R->>V: TuiView::new()
+        activate V
+        V-->>R: view
+        deactivate V
+        R->>R: snapshot_settings()
     end
 
     rect rgb(180, 220, 190)
-        note right of V: MAIN LOOP (TICK)
+        note right of R: MAIN LOOP
         loop Until Quit
-            V->>TH: new_tick()
-            TH-->>V: redraw?
+            R->>TH: new_tick()
+            TH-->>R: tick_elapsed?
 
             opt Has Input
-                V->>V: get_input()
                 alt Page::Timer
-                    V->>TU: update(TimerMsg, pomodoro)
-                    activate TU
-                    TU-->>V: (new_pomodoro, TimerCmd)
-                    deactivate TU
-                    V->>V: handle_timer_cmd(TimerCmd, model)
+                    R->>R: handle_timer(event)
+                    opt prompt_transition
+                        R->>R: handle_timer_transition(event)
+                        alt Enter / 'y'
+                            R->>R: transition()
+                            R->>R: update_timer(SetPromptNextSession(false))
+                        else Esc / 'n'
+                            R->>R: quit()
+                        end
+                    end
+                    R->>P: update(PomodoroMsg)
+                    activate P
+                    P-->>R: PomodoroCmd
+                    deactivate P
+                    R->>R: handle_pomodoro_cmd(cmd)
                 else Page::Settings
-                    V->>V: handle_settings(input, model)
+                    R->>R: handle_settings(event)
                     alt Is Editing
-                        V->>V: handle_settings_edit(input, model)
-                        V->>SU: update(SettingsMsg, config)
-                        activate SU
-                        SU-->>V: (new_config, SettingsCmd)
-                        deactivate SU
+                        R->>R: handle_settings_edit(event)
+                        alt Prompt Done
+                            R->>R: apply_settings_edit()
+                            R->>R: update_settings(CancelEditing)
+                            R->>C: update(ConfigMsg)
+                            activate C
+                            C-->>R: ConfigCmd
+                            deactivate C
+                            R->>R: update_settings(SetUnsavedChanges(bool))
+                        else Prompt Aborted
+                            R->>R: update_settings(CancelEditing)
+                        end
                     else Is Navigating
-                        V->>SU: update(SettingsMsg, config)
-                        activate SU
-                        SU-->>V: (new_config, SettingsCmd)
-                        deactivate SU
+                        R->>R: update_settings(SettingsMsg)
                     end
                 end
+                R->>R: redraw = true
             end
 
             opt Redraw
-                V->>V: tick(model)
-                V->>TU: tick(auto_next, &model.timer)
-                TU-->>V: TimerCmd
-                V->>V: handle_timer_cmd(TimerCmd, model)
+                R->>R: tick()
+                R->>P: update(Tick { auto_next })
+                activate P
+                P-->>R: PomodoroCmd
+                deactivate P
+                R->>R: handle_pomodoro_cmd(cmd)
 
-                opt TimerCmd::PromptNextSession
-                    V->>TR: set_prompt_next_session(true)
+                opt PomodoroCmd::PromptNextSession
+                    R->>R: on_session_end()
+                    R->>R: update_timer(SetPromptNextSession(true))
                 end
 
-                opt TimerCmd::NextSession
-                    V->>V: on_session_end(&model)
-                    V->>S: play_sound(next_state)
-                    V->>V: send_notification(next_state)
-                    V->>V: run_hooks(hooks, curr_state)
-                    V->>TU: update(NextState, pomodoro)
-                    TU-->>V: (new_pomodoro, SessionContinued)
+                opt PomodoroCmd::NextSession
+                    R->>R: on_session_end()
+                    R->>S: play_sound(next_mode)
+                    R->>R: send_notification(next_mode)
+                    R->>R: run_hooks(hooks, curr_mode)
+                    R->>R: transition()
                 end
 
-                V->>TR: flush(frame, router, pomodoro, config)
-                activate TR
-                TR-->>V: frame drawn
-                deactivate TR
-                V->>T: tick()
-                V->>T: render(area, buffer)
-                V->>V: terminal.draw()
+                R->>V: render_stateful_ref(frame, canvas, state)
+                activate V
+                V-->>R: frame drawn
+                deactivate V
+                R->>T: tick()
+                R->>T: render(area, buffer)
+                R->>R: terminal.draw()
             end
 
-            V->>V: sleep(10ms)
+            R->>R: sleep(10ms)
         end
     end
