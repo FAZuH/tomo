@@ -4,6 +4,7 @@ use std::time::Duration;
 use crate::config::Config;
 use crate::config::Percentage;
 use crate::ui::Update;
+use crate::ui::Updateable;
 
 pub const SETTINGS_VIEW_ITEMS: u32 = 16;
 
@@ -84,5 +85,14 @@ impl Update for SettingsUpdate {
             AlarmVolumeLong(v) => alarm.long.volume = v,
         }
         cmd
+    }
+}
+
+impl Updateable for Config {
+    type Msg = SettingsMsg;
+    type Cmd = SettingsCmd;
+
+    fn update(&mut self, msg: Self::Msg) -> Self::Cmd {
+        SettingsUpdate::update(msg, self)
     }
 }

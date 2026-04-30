@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use crate::models::Pomodoro;
 use crate::ui::Update;
+use crate::ui::Updateable;
 
 #[derive(Clone, Debug, Copy, PartialEq, Eq)]
 pub enum TimerMsg {
@@ -63,5 +64,14 @@ impl Update for TimerUpdate {
             Tick { auto_next } => cmd = Self::tick(auto_next, model),
         }
         cmd
+    }
+}
+
+impl Updateable for Pomodoro {
+    type Msg = TimerMsg;
+    type Cmd = TimerCmd;
+
+    fn update(&mut self, msg: Self::Msg) -> Self::Cmd {
+        TimerUpdate::update(msg, self)
     }
 }

@@ -43,7 +43,7 @@ pub struct TuiView {
     toast: ToastHandler,
 }
 
-impl View for TuiView {
+impl Runner for TuiView {
     fn run(&mut self) -> Result<(), UiError> {
         Ok(self.run_loop()?)
     }

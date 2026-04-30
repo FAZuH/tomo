@@ -1,10 +1,12 @@
 pub mod router;
+pub mod traits;
 pub mod tui;
 pub mod update;
 
 pub use router::Navigation;
 pub use router::Page;
 pub use router::Router;
+pub use traits::*;
 pub use update::SettingsCmd;
 pub use update::SettingsMsg;
 pub use update::SettingsUpdate;
@@ -28,6 +30,25 @@ pub struct AppModel {
     pub settings: Config,
 }
 
-pub trait View {
-    fn run(&mut self) -> Result<(), UiError>;
+#[derive(Clone, Debug, PartialEq)]
+pub enum AppMsg {
+    Timer(TimerMsg),
+    Settings(SettingsMsg),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AppCmd {
+    None,
+}
+
+impl Updateable for AppModel {
+    type Msg = AppMsg;
+    type Cmd = AppCmd;
+
+    fn update(&mut self, msg: Self::Msg) -> Self::Cmd {
+        match msg {
+            AppMsg::Timer(_timer_msg) => todo!(),
+            AppMsg::Settings(_settings_msg) => todo!(),
+        }
+    }
 }
