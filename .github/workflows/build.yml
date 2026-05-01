@@ -18,6 +18,11 @@ on:
         required: false
         type: boolean
         default: false
+      require-patched-cargo:
+        description: 'Fail if patched Cargo.toml artifact is not found'
+        required: false
+        type: boolean
+        default: false
 
 env:
   CARGO_TERM_COLOR: always
@@ -86,10 +91,18 @@ jobs:
           echo "VCPKGRS_DYNAMIC=0" >> $env:GITHUB_ENV
 
       - name: Download Patched Cargo.toml
+        id: download-cargo
         uses: actions/download-artifact@v4
         with:
           name: patched-cargo-toml
           path: .
+        continue-on-error: true
+
+      - name: Verify Patched Cargo.toml
+        if: inputs.require-patched-cargo && steps.download-cargo.outcome == 'failure'
+        run: |
+          echo "::error::Patched Cargo.toml artifact is required but was not found. Ensure patch-version ran before this job."
+          exit 1
 
       - name: Build
         run: cargo build --target ${{ matrix.target }} ${{ inputs.cargo-build-args }}

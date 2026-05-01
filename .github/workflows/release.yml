@@ -62,6 +62,7 @@ jobs:
       cargo-build-args: '--release --all-features --all-targets'
       upload-binary: true
       release: true
+      require-patched-cargo: true
 
   publish-changelog:
     name: Publish Changelog Commit

@@ -42,6 +42,7 @@ jobs:
       - name: Patch Cargo.toml
         run: |
           VERSION=${{ steps.set-version.outputs.version }}
+          VERSION=${VERSION#v}
           sed -i "0,/^version = \".*\"/{s/^version = \".*\"/version = \"$VERSION\"/}" Cargo.toml
 
       - name: Upload patched Cargo.toml
