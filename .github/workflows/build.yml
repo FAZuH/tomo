@@ -13,24 +13,33 @@ on:
         required: false
         type: boolean
         default: false
-      binary-artifact-name:
-        description: 'Name of the binary artifact'
-        required: false
-        type: string
-        default: 'tomo'
-      binary-artifact-path:
-        description: 'Path to the binary artifact'
-        required: false
-        type: string
-        default: 'target/release/tomo'
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
   build-binary:
-    name: Build Binary
-    runs-on: ubuntu-latest
+    name: Build Binary (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            binary: tomo
+            asset_name: tomo-linux-x64
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            binary: tomo.exe
+            asset_name: tomo-windows-x64.exe
+          - target: x86_64-apple-darwin
+            os: macos-latest
+            binary: tomo
+            asset_name: tomo-macos-x64
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            binary: tomo
+            asset_name: tomo-macos-arm64
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -42,14 +51,34 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
+          targets: ${{ matrix.target }}
 
       - name: Rust Cache
         uses: Swatinem/rust-cache@v2
         with:
-          shared-key: "ci"
+          shared-key: "ci-${{ matrix.target }}"
 
-      - name: Install dependencies
+      - name: Install dependencies (Linux)
+        if: matrix.os == 'ubuntu-latest'
         run: sudo apt-get update && sudo apt-get install -y pkg-config libfontconfig1-dev libsqlite3-dev libasound2-dev
+
+      - name: Install dependencies (macOS)
+        if: matrix.os == 'macos-latest'
+        run: brew install pkg-config
+
+      - name: Cache vcpkg
+        if: matrix.os == 'windows-latest'
+        uses: actions/cache@v4
+        with:
+          path: C:/vcpkg/installed
+          key: vcpkg-sqlite3-x64-windows-static
+
+      - name: Install SQLite (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          vcpkg install sqlite3:x64-windows-static
+          echo "SQLITE3_LIB_DIR=C:/vcpkg/installed/x64-windows-static/lib" >> $env:GITHUB_ENV
+          echo "VCPKGRS_DYNAMIC=0" >> $env:GITHUB_ENV
 
       - name: Download Patched Cargo.toml
         uses: actions/download-artifact@v4
@@ -59,11 +88,24 @@ jobs:
         continue-on-error: true
 
       - name: Build
-        run: cargo build ${{ inputs.cargo-build-args }}
+        run: cargo build --target ${{ matrix.target }} ${{ inputs.cargo-build-args }}
+
+      - name: Prepare Artifact (Unix)
+        if: matrix.os != 'windows-latest' && inputs.upload-binary
+        run: |
+          mkdir -p artifacts
+          cp target/${{ matrix.target }}/debug/${{ matrix.binary }} artifacts/${{ matrix.asset_name }}
+          chmod +x artifacts/${{ matrix.asset_name }}
+
+      - name: Prepare Artifact (Windows)
+        if: matrix.os == 'windows-latest' && inputs.upload-binary
+        run: |
+          mkdir artifacts
+          copy target\${{ matrix.target }}\debug\${{ matrix.binary }} artifacts\${{ matrix.asset_name }}
 
       - name: Upload Binary Artifact
-        if: ${{ inputs.upload-binary }}
+        if: inputs.upload-binary
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ inputs.binary-artifact-name }}
-          path: ${{ inputs.binary-artifact-path }}
+          name: ${{ matrix.asset_name }}
+          path: artifacts/${{ matrix.asset_name }}

@@ -15,6 +15,8 @@ jobs:
     name: Build
     if: "! github.event.pull_request.draft"
     uses: ./.github/workflows/build.yml
+    with:
+      upload-binary: true
 
   format-and-test:
     name: Run Rust Tests
