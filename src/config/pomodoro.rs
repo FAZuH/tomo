@@ -17,6 +17,7 @@ pub struct PomodoroConfig {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
 pub struct Timers {
+    pub auto_start_on_launch: bool,
     #[serde(with = "duration_as_secs")]
     pub focus: Duration,
     #[serde(with = "duration_as_secs")]
@@ -53,6 +54,7 @@ mod duration_as_secs {
 impl Default for Timers {
     fn default() -> Self {
         Self {
+            auto_start_on_launch: false,
             focus: Duration::from_mins(25),
             short: Duration::from_mins(5),
             long: Duration::from_mins(10),

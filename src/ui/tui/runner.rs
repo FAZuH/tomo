@@ -388,6 +388,7 @@ impl TuiRunner {
         use ConfigMsg::*;
         use SettingsItem as I;
         let msg = match selected {
+            I::AutoStartOnLaunch => AutoStartOnLaunch,
             I::TimerFocus => TimerFocus(self.parse_dur(value)?),
             I::TimerShort => TimerShort(self.parse_dur(value)?),
             I::TimerLong => TimerLong(self.parse_dur(value)?),

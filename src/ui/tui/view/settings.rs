@@ -188,6 +188,7 @@ impl TuiSettingsView {
             r.push(SectionRow::Blank);
         }
         r.push(SectionRow::SubSectionHeader("Auto Start".into()));
+        self.add_box(model, AutoStartOnLaunch, conf.auto_start_on_launch, &mut r);
         self.add_box(model, TimerAutoFocus, conf.auto_focus, &mut r);
         self.add_box(model, TimerAutoShort, conf.auto_short, &mut r);
         self.add_box(model, TimerAutoLong, conf.auto_long, &mut r);

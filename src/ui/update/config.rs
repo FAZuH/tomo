@@ -10,6 +10,7 @@ pub const SETTINGS_VIEW_ITEMS: u32 = 16;
 #[derive(Clone, Debug, PartialEq)]
 pub enum ConfigMsg {
     // Timer settings
+    AutoStartOnLaunch,
     TimerFocus(Duration),
     TimerShort(Duration),
     TimerLong(Duration),
@@ -49,6 +50,7 @@ impl Updateable for Config {
         let cmd = ConfigCmd::None;
         match msg {
             // Timer
+            AutoStartOnLaunch => timer.auto_start_on_launch = !timer.auto_start_on_launch,
             TimerFocus(d) => timer.focus = d,
             TimerShort(d) => timer.short = d,
             TimerLong(d) => timer.long = d,
