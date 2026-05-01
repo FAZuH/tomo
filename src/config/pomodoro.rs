@@ -54,7 +54,7 @@ mod duration_as_secs {
 impl Default for Timers {
     fn default() -> Self {
         Self {
-            auto_start_on_launch: false,
+            auto_start_on_launch: true,
             focus: Duration::from_mins(25),
             short: Duration::from_mins(5),
             long: Duration::from_mins(10),
