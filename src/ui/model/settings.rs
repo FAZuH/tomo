@@ -110,18 +110,18 @@ impl SettingsItem {
 
     pub fn label_long(&self) -> &'static str {
         match self.index() {
-            0 => "Focus",
-            1 => "Short Break",
-            2 => "Long Break",
+            0 => "Focus Duration",
+            1 => "Short Break Duration",
+            2 => "Long Break Duration",
             3 => "Long Break Interval",
 
-            7 => "Focus Hook",
-            8 => "Short Break Hook",
-            9 => "Long Break Hook",
+            7 => "Focus Hook Command",
+            8 => "Short Break Hook Command",
+            9 => "Long Break Hook Command",
 
-            10 => "Focus Alarm",
-            11 => "Short Break Alarm",
-            12 => "Long Break Alarm",
+            10 => "Focus Alarm Sound File Path",
+            11 => "Short Break Alarm Sound File Path",
+            12 => "Long Break Alarm Sound File Path",
 
             13 => "Focus Alarm Volume",
             14 => "Short Break Alarm Volume",
