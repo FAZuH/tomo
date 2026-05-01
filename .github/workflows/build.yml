@@ -13,6 +13,11 @@ on:
         required: false
         type: boolean
         default: false
+      release:
+        description: 'Whether this is a release build (affects artifact path)'
+        required: false
+        type: boolean
+        default: false
 
 env:
   CARGO_TERM_COLOR: always
@@ -85,7 +90,6 @@ jobs:
         with:
           name: patched-cargo-toml
           path: .
-        continue-on-error: true
 
       - name: Build
         run: cargo build --target ${{ matrix.target }} ${{ inputs.cargo-build-args }}
@@ -94,14 +98,14 @@ jobs:
         if: matrix.os != 'windows-latest' && inputs.upload-binary
         run: |
           mkdir -p artifacts
-          cp target/${{ matrix.target }}/debug/${{ matrix.binary }} artifacts/${{ matrix.asset_name }}
+          cp target/${{ matrix.target }}/${{ inputs.release && 'release' || 'debug' }}/${{ matrix.binary }} artifacts/${{ matrix.asset_name }}
           chmod +x artifacts/${{ matrix.asset_name }}
 
       - name: Prepare Artifact (Windows)
         if: matrix.os == 'windows-latest' && inputs.upload-binary
         run: |
           mkdir artifacts
-          copy target\${{ matrix.target }}\debug\${{ matrix.binary }} artifacts\${{ matrix.asset_name }}
+          copy target\${{ matrix.target }}\${{ inputs.release && 'release' || 'debug' }}\${{ matrix.binary }} artifacts\${{ matrix.asset_name }}
 
       - name: Upload Binary Artifact
         if: inputs.upload-binary

@@ -11,8 +11,14 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  patch-version:
+    name: Patch Version
+    if: "! github.event.pull_request.draft"
+    uses: ./.github/workflows/patch-version.yml
+
   build:
     name: Build
+    needs: patch-version
     if: "! github.event.pull_request.draft"
     uses: ./.github/workflows/build.yml
     with:
