@@ -17,6 +17,7 @@ use tui_widgets::prompts::Status;
 
 use crate::config::Config;
 use crate::config::Percentage;
+use crate::config::pomodoro::Alarm;
 use crate::model::Pomodoro;
 use crate::model::pomodoro::Mode;
 use crate::service::SoundService;
@@ -32,7 +33,7 @@ use crate::ui::tui::view::settings::SettingsState;
 use crate::ui::tui::view::timer::TimerState;
 use crate::ui::*;
 
-type Sound = Box<dyn SoundService<SoundType = Mode> + Send + Sync>;
+type Sound = Box<dyn SoundService<SoundType = Alarm> + Send + Sync>;
 type View = Box<
     dyn for<'a, 'b> StatefulViewRef<Canvas<'a, 'b>, State = TuiState, Result = ()> + Send + Sync,
 >;
@@ -152,7 +153,13 @@ impl TuiRunner {
 
     fn play_sound(&mut self) {
         if !self.sound.is_playing() {
-            self.sound.set_sound(self.state.pomo().next_mode());
+            let alarms = &self.state.settings.conf.pomodoro.alarm;
+            let alarm = match self.state.pomo().next_mode() {
+                Mode::Focus => &alarms.focus,
+                Mode::LongBreak => &alarms.long,
+                Mode::ShortBreak => &alarms.short,
+            };
+            self.sound.set_sound(alarm.clone());
             if let Err(e) = self.sound.play() {
                 self.show_toast(e.to_string(), ToastType::Error);
             }
@@ -243,7 +250,12 @@ impl TuiRunner {
                     self.state
                         .update_timer(TimerMsg::SetPromptNextSession(false));
                 }
-                KeyCode::Esc | KeyCode::Char('n') => self.quit(),
+                KeyCode::Esc | KeyCode::Char('n') => {
+                    self.transition();
+                    self.state.update_pomo(PomodoroMsg::Pause);
+                    self.state
+                        .update_timer(TimerMsg::SetPromptNextSession(false));
+                }
                 _ => {}
             }
         }
@@ -273,8 +285,8 @@ impl TuiRunner {
                 Down | Char('j') => {
                     let _ = self.state.update_settings(SelectDown);
                 }
-                Enter => {
-                    if self.state.settings_mut().selected().is_toggle() {
+                Enter | Char(' ') => {
+                    if self.state.settings().selected().is_toggle() {
                         self.apply_settings_edit()
                     } else {
                         let pomo = &self.state.conf().pomodoro.clone();
@@ -291,9 +303,6 @@ impl TuiRunner {
                     let _ = self.state.update_settings(SectionSelect(2));
                 }
                 Char('s') => self.save_settings(),
-                Char(' ') if self.state.settings().selected().is_toggle() => {
-                    self.apply_settings_edit()
-                }
                 Esc => self.state.router_mut().navigate(Page::Timer),
                 Char('q') => self.quit(),
                 Char('/') | Char('?') => self.state.settings_mut().toggle_keybinds(),
@@ -341,6 +350,7 @@ impl TuiRunner {
 impl TuiRunner {
     fn transition(&mut self) {
         self.state.update_pomo(PomodoroMsg::NextState);
+        let _ = self.sound.stop();
     }
 
     fn should_auto_next(&self) -> bool {
@@ -391,6 +401,7 @@ impl TuiRunner {
         use ConfigMsg::*;
         use SettingsItem as I;
         let msg = match selected {
+            I::AutoStartOnLaunch => AutoStartOnLaunch,
             I::TimerFocus => TimerFocus(self.parse_dur(value)?),
             I::TimerShort => TimerShort(self.parse_dur(value)?),
             I::TimerLong => TimerLong(self.parse_dur(value)?),

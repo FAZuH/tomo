@@ -34,9 +34,10 @@ pub enum SettingsCmd {
     EditValue(Option<String>),
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum SettingsItem {
     // Timer settings
+    AutoStartOnLaunch,
     TimerFocus,
     TimerShort,
     TimerLong,
@@ -69,18 +70,19 @@ impl SettingsItem {
             TimerShort => 1,
             TimerLong => 2,
             TimerLongInterval => 3,
-            TimerAutoFocus => 4,
-            TimerAutoShort => 5,
-            TimerAutoLong => 6,
-            HookFocus => 7,
-            HookShort => 8,
-            HookLong => 9,
-            AlarmPathFocus => 10,
-            AlarmPathShort => 11,
-            AlarmPathLong => 12,
-            AlarmVolumeFocus => 13,
-            AlarmVolumeShort => 14,
-            AlarmVolumeLong => 15,
+            AutoStartOnLaunch => 4,
+            TimerAutoFocus => 5,
+            TimerAutoShort => 6,
+            TimerAutoLong => 7,
+            HookFocus => 8,
+            HookShort => 9,
+            HookLong => 10,
+            AlarmPathFocus => 11,
+            AlarmPathShort => 12,
+            AlarmPathLong => 13,
+            AlarmVolumeFocus => 14,
+            AlarmVolumeShort => 15,
+            AlarmVolumeLong => 16,
         }
     }
 
@@ -91,18 +93,19 @@ impl SettingsItem {
             1 => TimerShort,
             2 => TimerLong,
             3 => TimerLongInterval,
-            4 => TimerAutoFocus,
-            5 => TimerAutoShort,
-            6 => TimerAutoLong,
-            7 => HookFocus,
-            8 => HookShort,
-            9 => HookLong,
-            10 => AlarmPathFocus,
-            11 => AlarmPathShort,
-            12 => AlarmPathLong,
-            13 => AlarmVolumeFocus,
-            14 => AlarmVolumeShort,
-            15 => AlarmVolumeLong,
+            4 => AutoStartOnLaunch,
+            5 => TimerAutoFocus,
+            6 => TimerAutoShort,
+            7 => TimerAutoLong,
+            8 => HookFocus,
+            9 => HookShort,
+            10 => HookLong,
+            11 => AlarmPathFocus,
+            12 => AlarmPathShort,
+            13 => AlarmPathLong,
+            14 => AlarmVolumeFocus,
+            15 => AlarmVolumeShort,
+            16 => AlarmVolumeLong,
             _ => return None,
         };
         Some(ret)
@@ -110,22 +113,22 @@ impl SettingsItem {
 
     pub fn label_long(&self) -> &'static str {
         match self.index() {
-            0 => "Focus",
-            1 => "Short Break",
-            2 => "Long Break",
+            0 => "Focus Duration",
+            1 => "Short Break Duration",
+            2 => "Long Break Duration",
             3 => "Long Break Interval",
 
-            7 => "Focus Hook",
-            8 => "Short Break Hook",
-            9 => "Long Break Hook",
+            8 => "Focus Hook Command",
+            9 => "Short Break Hook Command",
+            10 => "Long Break Hook Command",
 
-            10 => "Focus Alarm",
-            11 => "Short Break Alarm",
-            12 => "Long Break Alarm",
+            11 => "Focus Alarm Sound File Path",
+            12 => "Short Break Alarm Sound File Path",
+            13 => "Long Break Alarm Sound File Path",
 
-            13 => "Focus Alarm Volume",
-            14 => "Short Break Alarm Volume",
-            15 => "Long Break Alarm Volume",
+            14 => "Focus Alarm Volume",
+            15 => "Short Break Alarm Volume",
+            16 => "Long Break Alarm Volume",
             _ => panic!("label called on invalid item"),
         }
     }
@@ -137,21 +140,22 @@ impl SettingsItem {
             2 => "Long Break",
             3 => "Long Break Interval",
 
-            4 => "Focus",
-            5 => "Short Break",
-            6 => "Long Break",
+            4 => "Auto-start on Launch",
+            5 => "Focus",
+            6 => "Short Break",
+            7 => "Long Break",
 
-            7 => "Focus",
-            8 => "Short Break",
-            9 => "Long Break",
+            8 => "Focus",
+            9 => "Short Break",
+            10 => "Long Break",
 
-            10 => "Focus",
-            11 => "Short Break",
-            12 => "Long Break",
+            11 => "Focus",
+            12 => "Short Break",
+            13 => "Long Break",
 
-            13 => "Focus",
-            14 => "Short Break",
-            15 => "Long Break",
+            14 => "Focus",
+            15 => "Short Break",
+            16 => "Long Break",
             _ => panic!("label called on invalid item"),
         }
     }
@@ -164,9 +168,32 @@ impl SettingsItem {
         Self::toggles().contains(self)
     }
 
+    pub fn is_percentage(&self) -> bool {
+        Self::percentages().contains(self)
+    }
+
+    pub fn is_path(&self) -> bool {
+        self.paths().contains(self)
+    }
+
+    pub fn paths(&self) -> Vec<Self> {
+        use SettingsItem::*;
+        vec![AlarmPathFocus, AlarmPathLong, AlarmPathShort]
+    }
+
     fn toggles() -> Vec<Self> {
         use SettingsItem::*;
-        vec![TimerAutoFocus, TimerAutoShort, TimerAutoLong]
+        vec![
+            TimerAutoFocus,
+            TimerAutoShort,
+            TimerAutoLong,
+            AutoStartOnLaunch,
+        ]
+    }
+
+    fn percentages() -> Vec<Self> {
+        use SettingsItem::*;
+        vec![AlarmVolumeFocus, AlarmVolumeLong, AlarmVolumeShort]
     }
 }
 
@@ -187,9 +214,9 @@ impl SettingsSection {
     pub fn from_item_index(idx: u32) -> Option<Self> {
         use SettingsSection::*;
         let ret = match idx {
-            0..=6 => Timer,
-            7..=9 => Hook,
-            10..=15 => Alarm,
+            0..=7 => Timer,
+            8..=10 => Hook,
+            11..=16 => Alarm,
             _ => return None,
         };
         Some(ret)
@@ -332,25 +359,26 @@ impl SettingsModel {
         let alarm = &config.alarm;
         let hook = &config.hook;
         let timer = &config.timer;
-        let idx = self.selected.index();
-        let mut value = match idx {
-            0 => format!("{}", timer.focus.as_secs() / 60),
-            1 => format!("{}", timer.short.as_secs() / 60),
-            2 => format!("{}", timer.long.as_secs() / 60),
-            3 => format!("{}", timer.long_interval),
-            7 => hook.focus.clone(),
-            8 => hook.short.clone(),
-            9 => hook.long.clone(),
-            10 => alarm.focus.path(),
-            11 => alarm.short.path(),
-            12 => alarm.long.path(),
-            13 => alarm.focus.volume(),
-            14 => alarm.short.volume(),
-            15 => alarm.long.volume(),
-            _ => return, // Cannot edit toggles or out of bounds
+        use SettingsItem::*;
+
+        let mut value = match self.selected {
+            TimerFocus => format!("{}", timer.focus.as_secs() / 60),
+            TimerShort => format!("{}", timer.short.as_secs() / 60),
+            TimerLong => format!("{}", timer.long.as_secs() / 60),
+            TimerLongInterval => format!("{}", timer.long_interval),
+            HookFocus => hook.focus.clone(),
+            HookShort => hook.short.clone(),
+            HookLong => hook.long.clone(),
+            AlarmPathFocus => alarm.focus.path(),
+            AlarmPathShort => alarm.short.path(),
+            AlarmPathLong => alarm.long.path(),
+            AlarmVolumeFocus => alarm.focus.volume(),
+            AlarmVolumeShort => alarm.short.volume(),
+            AlarmVolumeLong => alarm.long.volume(),
+            AutoStartOnLaunch | TimerAutoFocus | TimerAutoShort | TimerAutoLong => return,
         };
 
-        if (13..=15).contains(&idx) {
+        if self.selected.is_percentage() {
             value = value[..value.len() - 1].to_string();
         }
 

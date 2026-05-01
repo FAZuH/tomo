@@ -6,6 +6,9 @@ pub trait SoundService {
     /// Plays sound in another thread.
     fn play(&mut self) -> Result<(), SoundError>;
 
+    /// Stops currently playing song if any.
+    fn stop(&mut self) -> Result<(), SoundError>;
+
     /// Is there any sound playing.
     fn is_playing(&self) -> bool;
 

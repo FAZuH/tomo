@@ -8,6 +8,8 @@ pub enum PomodoroMsg {
     Add(Duration),
     Subtract(Duration),
     TogglePause,
+    Pause,
+    Resume,
     SkipSession,
     ResetSession,
     Tick { auto_next: bool },
@@ -33,6 +35,12 @@ impl Updateable for Pomodoro {
             Add(dur) => self.add(dur),
             Subtract(dur) => self.subtract(dur),
             TogglePause => self.toggle_pause(),
+            Pause => {
+                let _ = self.pause();
+            }
+            Resume => {
+                let _ = self.resume();
+            }
             SkipSession => self.skip(),
             ResetSession => self.reset(),
             NextState => {
