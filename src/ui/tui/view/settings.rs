@@ -469,9 +469,6 @@ static KEYBINDS_ON: LazyLock<Paragraph<'static>> = LazyLock::new(|| {
         ]),
         Line::from(vec![
             Span::styled("Space/Enter", bright),
-            Span::styled(": Toggle", dim),
-            sep.clone(),
-            Span::styled("Enter", bright),
             Span::styled(": Edit", dim),
             sep.clone(),
             Span::styled("s", bright),

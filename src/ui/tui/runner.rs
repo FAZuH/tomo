@@ -273,8 +273,8 @@ impl TuiRunner {
                 Down | Char('j') => {
                     let _ = self.state.update_settings(SelectDown);
                 }
-                Enter => {
-                    if self.state.settings_mut().selected().is_toggle() {
+                Enter | Char(' ') => {
+                    if self.state.settings().selected().is_toggle() {
                         self.apply_settings_edit()
                     } else {
                         let pomo = &self.state.conf().pomodoro.clone();
@@ -291,9 +291,6 @@ impl TuiRunner {
                     let _ = self.state.update_settings(SectionSelect(2));
                 }
                 Char('s') => self.save_settings(),
-                Char(' ') if self.state.settings().selected().is_toggle() => {
-                    self.apply_settings_edit()
-                }
                 Esc => self.state.router_mut().navigate(Page::Timer),
                 Char('q') => self.quit(),
                 Char('/') | Char('?') => self.state.settings_mut().toggle_keybinds(),
