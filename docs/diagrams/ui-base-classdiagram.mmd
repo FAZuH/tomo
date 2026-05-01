@@ -6,14 +6,44 @@ config:
 classDiagram
     direction TD
 
-    class View~Model~:::view {
+    class Runner:::view {
         <<trait>>
-        +run(model: Model) Result~void, UiError~
+        +run(&mut self) Result~void, UiError~
     }
 
-    class AppModel:::model {
-        +timer: Pomodoro
-        +settings: Config
+    class Updateable:::controller {
+        <<trait>>
+        +type Msg
+        +type Cmd
+        +update(&mut self, msg: Msg) Cmd
+    }
+
+    class View~C~:::view {
+        <<trait>>
+        +type Result
+        +render(self, canvas: C) Result
+    }
+
+    class ViewRef~C~:::view {
+        <<trait>>
+        +type Result
+        +render_ref(&self, canvas: C) Result
+        +render_mut(&mut self, canvas: C) Result
+    }
+
+    class StatefulView~C~:::view {
+        <<trait>>
+        +type State
+        +type Result
+        +render_stateful(self, canvas: C, state: &mut State) Result
+    }
+
+    class StatefulViewRef~C~:::view {
+        <<trait>>
+        +type State
+        +type Result
+        +render_stateful_ref(&self, canvas: C, state: &mut State) Result
+        +render_stateful_mut(&mut self, canvas: C, state: &mut State) Result
     }
 
     class Page:::action {
@@ -38,30 +68,19 @@ classDiagram
         +is_quit() bool
     }
 
-    class Update~Msg, Model, Cmd~:::controller {
-        <<trait>>
-        +update(msg: Msg, model: Model) (Model, Cmd)
-    }
-
-    namespace Timer {
-        class TimerUpdate:::controller {
-            +new()
-            +tick(auto_next: bool, model: &Pomodoro) TimerCmd
-            +update(msg: TimerMsg, model: Pomodoro) (Pomodoro, TimerCmd)
-        }
-
-        class TimerMsg:::action {
+    namespace PomodoroUpdate {
+        class PomodoroMsg:::action {
             <<enumeration>>
             Add(Duration)
             Subtract(Duration)
             TogglePause
             SkipSession
             ResetSession
-            Tick(bool)
+            TickAutoNext(bool)
             NextState
         }
 
-        class TimerCmd:::action {
+        class PomodoroCmd:::action {
             <<enumeration>>
             None
             PromptNextSession
@@ -70,13 +89,8 @@ classDiagram
         }
     }
 
-    namespace Settings {
-        class SettingsUpdate:::controller {
-            +new()
-            +update(msg: SettingsMsg, model: Config) (Config, SettingsCmd)
-        }
-
-        class SettingsMsg:::action {
+    namespace ConfigUpdate {
+        class ConfigMsg:::action {
             <<enumeration>>
             TimerFocus(Duration)
             TimerShort(Duration)
@@ -96,7 +110,7 @@ classDiagram
             AlarmVolumeLong(Percentage)
         }
 
-        class SettingsCmd:::action {
+        class ConfigCmd:::action {
             <<enumeration>>
             None
         }
@@ -112,7 +126,7 @@ classDiagram
             -focus_sessions: u32
             -accumulated: Duration
             -running: bool
-            -state: State
+            -mode: Mode
             -anchor: Option~Instant~
             -frozen_remaining: Duration
             +new(focus, long, short, interval)
@@ -124,17 +138,19 @@ classDiagram
             +toggle_pause()
             +skip()
             +reset()
-            +state() State
+            +mode() Mode
             +is_running() bool
             +focus_sessions() u32
             +total_sessions() u32
+            +started_at() Option~Instant~
             +remaining_time() Duration
             +total_time() Duration
             +session_duration() Duration
-            +next_state() State
+            +progress() f64
+            +next_mode() Mode
         }
 
-        class State:::state {
+        class Mode:::state {
             <<enumeration>>
             Focus
             ShortBreak
@@ -183,30 +199,42 @@ classDiagram
 
         class Percentage:::model {
             +new(perc: f32)
+            +set(perc: f32)
+            +set_clamp(perc: f32)
+            +muted() Percentage
+            +half() Percentage
+            +full() Percentage
             +volume() f32
         }
     }
 
+    class UiError:::error {
+        +TuiError(TuiError)
+    }
+
+    class TuiError:::error {
+        +Io(io::Error)
+        +InitializeError(String)
+    }
+
+    Pomodoro ..|> Updateable : implements
+    Config ..|> Updateable : implements
+
+    Pomodoro ..> PomodoroMsg : receives
+    Pomodoro ..> PomodoroCmd : produces
+    Config ..> ConfigMsg : receives
+    Config ..> ConfigCmd : produces
+
     Router --> Page : active_page
     Router --> Navigation : handles
 
-    TimerUpdate ..|> Update
-    SettingsUpdate ..|> Update
-
-    TimerUpdate ..> Pomodoro : mutates
-    TimerUpdate ..> TimerMsg : receives
-    TimerUpdate ..> TimerCmd : produces
-    SettingsUpdate ..> Config : mutates
-    SettingsUpdate ..> SettingsMsg : receives
-    SettingsUpdate ..> SettingsCmd : produces
-    Pomodoro ..> State : state
+    Pomodoro ..> Mode : state
     Config ..> PomodoroConfig
     PomodoroConfig ..> Timers
     PomodoroConfig ..> Hooks
     PomodoroConfig ..> Alarms
     Alarms ..> Alarm
-    AppModel ..> Pomodoro
-    AppModel ..> Config
+    UiError ..> TuiError
 
     classDef view fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px,color:#000
     classDef controller fill:#bbdefb,stroke:#1565c0,stroke-width:2px,color:#000

@@ -57,7 +57,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_parse_opt_valid() {
+    fn parse_opt_valid() {
         let res = atodur("67h").unwrap();
         assert_eq!(res, Duration::from_hours(67));
 
@@ -84,13 +84,13 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_opt_empty() {
+    fn parse_opt_empty() {
         let res = atodur("");
         assert!(matches!(res, Err(CliArgumentError::EmptyArgument)));
     }
 
     #[test]
-    fn test_parse_opt_invalid() {
+    fn parse_opt_invalid() {
         let res = atodur("six seven");
         assert!(matches!(res, Err(CliArgumentError::ParseError(_))));
 

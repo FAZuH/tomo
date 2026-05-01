@@ -30,6 +30,7 @@ impl ToastHandler {
                 self.engine.hide_toast();
             }
         }
+        self.engine.purge_expired();
     }
 }
 
