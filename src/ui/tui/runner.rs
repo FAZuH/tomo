@@ -55,7 +55,7 @@ pub struct TuiRunner {
     view: View,
 
     sound: Sound,
-    tick: TickHandler,
+    tick: TickTimer,
 }
 
 impl Runner for TuiRunner {
@@ -80,7 +80,7 @@ impl TuiRunner {
             terminal,
             view,
             sound,
-            tick: TickHandler::default(),
+            tick: TickTimer::default(),
         })
     }
 
@@ -573,12 +573,12 @@ impl TuiState {
 //   |_| |___\___|_|\_\
 // ---------------------------------------------------------
 
-struct TickHandler {
+struct TickTimer {
     last_tick: Instant,
     tick_rate: Duration,
 }
 
-impl TickHandler {
+impl TickTimer {
     fn new(tick_rate: Duration) -> Self {
         Self {
             last_tick: Instant::now(),
@@ -602,7 +602,7 @@ impl TickHandler {
     }
 }
 
-impl Default for TickHandler {
+impl Default for TickTimer {
     fn default() -> Self {
         Self::new(Duration::from_secs(1))
     }
