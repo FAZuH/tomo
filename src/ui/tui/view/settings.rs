@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::path::Path;
 use std::sync::LazyLock;
 
 use ratatui::layout::Flex;
@@ -8,6 +9,7 @@ use ratatui::widgets::Block;
 use ratatui::widgets::Borders;
 use ratatui::widgets::Clear;
 use ratatui::widgets::Paragraph;
+use tui_widgets::prompts::State as _;
 use tui_widgets::prompts::prelude::*;
 use tui_widgets::scrollview::ScrollView;
 use tui_widgets::scrollview::ScrollbarVisibility;
@@ -58,7 +60,7 @@ impl<'a> StatefulViewRef<Canvas<'a, '_>> for TuiSettingsView {
         let content_width = content_area.width.saturating_sub(2).max(46);
 
         // Build sections with proper layout
-        let sections = self.build_sections(model, &conf.pomodoro);
+        let sections = self.sections(model, &conf.pomodoro);
 
         // Create scroll view with full content size
         let mut scroll_view = ScrollView::new(Size::new(content_width, content_area.height))
@@ -107,12 +109,15 @@ impl TuiSettingsView {
     }
 
     fn prompt(&self, frame: &mut Frame, area: Rect, model: &mut SettingsModel) {
-        // Render prompt overlay
         if let Some(ref mut prompt) = model.prompt_state_mut() {
             let buf = frame.buffer_mut();
             let popup_width = 50.min(area.width.saturating_sub(4));
-            let popup_height = 3;
 
+            let inner_width = popup_width.saturating_sub(2).max(1);
+            let text_len = prompt.text_state.value().chars().count() as u16;
+            let prefix_len = 5; // "?  › "
+            let lines_needed = (text_len + prefix_len) / inner_width + 1;
+            let popup_height = (lines_needed + 2).max(3).min(area.height);
             let vertical = Layout::vertical([Constraint::Length(popup_height)]).flex(Flex::Center);
             let horizontal =
                 Layout::horizontal([Constraint::Length(popup_width)]).flex(Flex::Center);
@@ -133,22 +138,17 @@ impl TuiSettingsView {
     }
 
     /// Build sections from config, calculating layout and identifying editable items
-    fn build_sections(&self, model: &SettingsModel, config: &PomodoroConfig) -> Vec<Section> {
+    fn sections(&self, model: &SettingsModel, config: &PomodoroConfig) -> Vec<Section> {
         let mut sections = Vec::new();
 
-        self.build_timer_section(model, &config.timer, &mut sections);
-        self.build_hooks_section(model, &config.hook, &mut sections);
-        self.build_alarm_section(model, &config.alarm, &mut sections);
+        self.timer_section(model, &config.timer, &mut sections);
+        self.hook_section(model, &config.hook, &mut sections);
+        self.alarm_section(model, &config.alarm, &mut sections);
 
         sections
     }
 
-    fn build_timer_section(
-        &self,
-        model: &SettingsModel,
-        conf: &Timers,
-        sections: &mut Vec<Section>,
-    ) {
+    fn timer_section(&self, model: &SettingsModel, conf: &Timers, sections: &mut Vec<Section>) {
         use SettingsItem::*;
         // Build Pomodoro Timer section
         let mut r = Vec::new();
@@ -188,6 +188,7 @@ impl TuiSettingsView {
             r.push(SectionRow::Blank);
         }
         r.push(SectionRow::SubSectionHeader("Auto Start".into()));
+        self.add_box(model, AutoStartOnLaunch, conf.auto_start_on_launch, &mut r);
         self.add_box(model, TimerAutoFocus, conf.auto_focus, &mut r);
         self.add_box(model, TimerAutoShort, conf.auto_short, &mut r);
         self.add_box(model, TimerAutoLong, conf.auto_long, &mut r);
@@ -202,12 +203,7 @@ impl TuiSettingsView {
         });
     }
 
-    fn build_hooks_section(
-        &self,
-        model: &SettingsModel,
-        conf: &Hooks,
-        sections: &mut Vec<Section>,
-    ) {
+    fn hook_section(&self, model: &SettingsModel, conf: &Hooks, sections: &mut Vec<Section>) {
         use SettingsItem::*;
         // Build Command Hooks section
         let mut r = Vec::new();
@@ -231,12 +227,7 @@ impl TuiSettingsView {
         });
     }
 
-    fn build_alarm_section(
-        &self,
-        model: &SettingsModel,
-        conf: &Alarms,
-        sections: &mut Vec<Section>,
-    ) {
+    fn alarm_section(&self, model: &SettingsModel, conf: &Alarms, sections: &mut Vec<Section>) {
         use SettingsItem::*;
         let mut r = Vec::new();
 
@@ -270,10 +261,18 @@ impl TuiSettingsView {
         value: impl ToString,
         rows: &mut Vec<SectionRow>,
     ) {
+        let value = value.to_string();
         rows.push(SectionRow::Input {
             label: item.label().into(),
-            value: value.to_string(),
             is_selected: model.selected() == item,
+            warning: {
+                if item.is_path() {
+                    !Path::new(&value).exists()
+                } else {
+                    false
+                }
+            },
+            value,
         });
     }
 
@@ -321,6 +320,7 @@ enum SectionRow {
         label: String,
         value: String,
         is_selected: bool,
+        warning: bool,
     },
     Checkbox {
         label: String,
@@ -402,9 +402,16 @@ impl Widget for SectionRow {
                 label,
                 value,
                 is_selected,
+                warning,
             } => {
                 let bg = if is_selected {
                     Style::default().bg(Color::DarkGray)
+                } else {
+                    Style::default()
+                };
+
+                let fg = if warning {
+                    Style::default().fg(Color::LightRed)
                 } else {
                     Style::default()
                 };
@@ -414,7 +421,7 @@ impl Widget for SectionRow {
                         format!(" {label}: "),
                         Style::default().add_modifier(Modifier::DIM).patch(bg),
                     ),
-                    Span::styled(value, Style::default().patch(bg)),
+                    Span::styled(value, Style::default().patch(bg).patch(fg)),
                 ]);
                 Paragraph::new(line).render(area, buf);
             }
@@ -469,9 +476,6 @@ static KEYBINDS_ON: LazyLock<Paragraph<'static>> = LazyLock::new(|| {
         ]),
         Line::from(vec![
             Span::styled("Space/Enter", bright),
-            Span::styled(": Toggle", dim),
-            sep.clone(),
-            Span::styled("Enter", bright),
             Span::styled(": Edit", dim),
             sep.clone(),
             Span::styled("s", bright),

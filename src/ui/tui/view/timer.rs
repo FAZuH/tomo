@@ -83,13 +83,13 @@ impl TuiTimerView {
                 Line::from(vec![
                     Span::from("       "),
                     Span::styled(
-                        "  y/enter: Yes  ",
-                        Style::new().fg(Color::DarkGray).bg(Color::Green),
+                        "  y/Enter: Yes  ",
+                        Style::new().fg(Color::Green).bg(Color::DarkGray),
                     ),
                     Span::from("   "),
                     Span::styled(
-                        "  n/esc: No  ",
-                        Style::new().fg(Color::DarkGray).bg(Color::Red),
+                        "  n/Esc: No  ",
+                        Style::new().fg(Color::Red).bg(Color::DarkGray),
                     ),
                     Span::from("       "),
                 ])
@@ -267,10 +267,10 @@ static KEYBINDS_ON: LazyLock<Paragraph<'static>> = LazyLock::new(|| {
             Span::styled("Backspace", bright),
             Span::styled(": Reset", dim),
             sep.clone(),
-            Span::styled("", bright),
+            Span::styled("←/→/h/l", bright),
             Span::styled(": ±30s", dim),
             sep.clone(),
-            Span::styled("", bright),
+            Span::styled("↑/↓/j/k", bright),
             Span::styled(": ±1m", dim),
             sep.clone(),
             Span::styled("q", bright),
