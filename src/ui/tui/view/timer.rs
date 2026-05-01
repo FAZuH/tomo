@@ -28,8 +28,8 @@ impl TuiTimerView {
 }
 
 pub struct TimerState {
-    pub(super) model: TimerModel,
-    pub(super) pomo: Pomodoro,
+    pub model: TimerModel,
+    pub pomo: Pomodoro,
 }
 
 impl TimerState {

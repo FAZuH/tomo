@@ -28,8 +28,8 @@ type State = SettingsState;
 pub struct TuiSettingsView {}
 
 pub struct SettingsState {
-    pub(super) model: SettingsModel,
-    pub(super) conf: Config,
+    pub model: SettingsModel,
+    pub conf: Config,
 }
 
 impl SettingsState {
