@@ -85,7 +85,7 @@ impl Percentage {
     }
 
     pub fn half() -> Self {
-        Self(0.0)
+        Self(0.5)
     }
 
     pub fn full() -> Self {
