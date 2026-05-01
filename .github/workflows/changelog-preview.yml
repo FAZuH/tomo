@@ -60,16 +60,3 @@ jobs:
           config-file-path: ./.github/.config.js
           version-file: ./version.json
           preset: conventionalcommits
-
-      - name: Post Changelog Preview
-        if: steps.changelog.outputs.changelog != ''
-        uses: marocchino/sticky-pull-request-comment@v2
-        with:
-          header: changelog-preview
-          recreate: true
-          message: |
-            ## Changelog Preview
-
-            **Proposed version:** `${{ steps.changelog.outputs.tag }}`
-
-            ${{ steps.changelog.outputs.changelog }}
