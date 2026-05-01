@@ -18,19 +18,18 @@ new_without_default = "allow"
 chrono = "0.4.44"
 clap = { version = "4.6.0", features = ["derive"] }
 crossterm = "0.29.0"
-diesel = { version = "2.3.7", features = ["chrono", "r2d2", "returning_clauses_for_sqlite_3_35", "sqlite"] }
-diesel_migrations = "2.3.1"
+# diesel = { version = "2.3.7", features = ["chrono", "r2d2", "returning_clauses_for_sqlite_3_35", "sqlite"] }
+# diesel_migrations = "2.3.1"
 figlet-rs = "1.0.0"
 log = "0.4.29"
 notify-rust = "4.16.0"
 ratatui = "0.30.0"
-ratatui-toaster = { path = "./crates/ratatui-toaster", features = ["tokio"] }
+ratatui-toaster = { path = "./crates/ratatui-toaster" }
 rodio = { version = "0.22.2", features = ["tracing"] }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_yml = "0.0.12"
 shlex = "1.3.0"
 thiserror = "2.0.18"
-tokio = { version = "1.52.1", features = ["macros", "rt", "rt-multi-thread", "signal", "sync", "time"] }
 tracing = "0.1.44"
 tracing-appender = "0.2.5"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }

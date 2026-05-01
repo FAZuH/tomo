@@ -6,30 +6,22 @@ use ratatui::layout::Rect;
 use ratatui_toaster::ToastEngine;
 use ratatui_toaster::ToastEngineBuilder;
 use ratatui_toaster::ToastMessage;
-use tokio::sync::mpsc;
 
 pub struct ToastHandler {
     engine: ToastEngine<ToastMessage>,
-    rx: mpsc::Receiver<ToastMessage>,
 }
 
 impl ToastHandler {
     pub fn new() -> Self {
-        let (tx, rx) = mpsc::channel(100);
         let engine = ToastEngineBuilder::new(Rect::default())
             .default_duration(Duration::from_secs(3))
-            .action_tx(tx)
             .build();
 
-        Self { engine, rx }
+        // Self { engine, rx }
+        Self { engine }
     }
 
     pub fn tick(&mut self) {
-        while let Ok(msg) = self.rx.try_recv() {
-            if matches!(msg, ToastMessage::Hide) {
-                self.engine.hide_toast();
-            }
-        }
         self.engine.purge_expired();
     }
 }
