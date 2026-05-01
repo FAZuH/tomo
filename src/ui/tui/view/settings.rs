@@ -17,10 +17,7 @@ use crate::config::pomodoro::Alarms;
 use crate::config::pomodoro::Hooks;
 use crate::config::pomodoro::PomodoroConfig;
 use crate::config::pomodoro::Timers;
-use crate::ui::StatefulViewRef;
-use crate::ui::tui::model::SettingsItem;
-use crate::ui::tui::model::SettingsModel;
-use crate::ui::tui::model::SettingsSection;
+use crate::ui::prelude::*;
 use crate::ui::tui::view::Canvas;
 
 type State = SettingsState;

@@ -6,7 +6,7 @@ use tui_widgets::prompts::TextState;
 use tui_widgets::scrollview::ScrollViewState;
 
 use crate::config::pomodoro::PomodoroConfig;
-use crate::ui::Updateable;
+use crate::ui::prelude::*;
 use crate::ui::tui::view::settings::SettingsPrompt;
 use crate::ui::update::config::SETTINGS_VIEW_ITEMS;
 

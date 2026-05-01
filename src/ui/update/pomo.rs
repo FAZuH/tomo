@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use crate::models::Pomodoro;
-use crate::ui::Updateable;
+use crate::ui::prelude::*;
 
 #[derive(Clone, Debug, Copy, PartialEq, Eq)]
 pub enum PomodoroMsg {

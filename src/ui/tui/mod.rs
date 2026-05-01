@@ -1,5 +1,4 @@
 pub mod backend;
-pub mod model;
 pub mod runner;
 pub mod toasts;
 pub mod view;

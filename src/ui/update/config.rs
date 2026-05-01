@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use crate::config::Config;
 use crate::config::Percentage;
-use crate::ui::Updateable;
+use crate::ui::prelude::*;
 
 pub const SETTINGS_VIEW_ITEMS: u32 = 16;
 

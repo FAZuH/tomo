@@ -1,4 +1,4 @@
-use crate::ui::Updateable;
+use crate::ui::prelude::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TimerMsg {

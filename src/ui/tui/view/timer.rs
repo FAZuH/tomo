@@ -11,8 +11,7 @@ use tui_widgets::popup::Popup;
 
 use crate::models::Pomodoro;
 use crate::models::pomodoro::Mode;
-use crate::ui::StatefulViewRef;
-use crate::ui::tui::model::TimerModel;
+use crate::ui::prelude::*;
 use crate::utils;
 
 type State = TimerState;

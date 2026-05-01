@@ -8,9 +8,7 @@ pub use timer::TimerState;
 pub use timer::TuiTimerView;
 
 use crate::config::Config;
-use crate::ui::StatefulViewRef;
-use crate::ui::router::Page;
-use crate::ui::router::Router;
+use crate::ui::prelude::*;
 use crate::ui::tui::toasts::ToastHandler;
 
 pub type Canvas<'a, 'b> = &'a mut Frame<'b>;
