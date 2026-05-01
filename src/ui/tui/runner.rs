@@ -2,7 +2,6 @@ use std::borrow::Cow;
 use std::ops::Deref;
 use std::ops::DerefMut;
 use std::path::PathBuf;
-use std::thread::sleep;
 use std::time::Duration;
 use std::time::Instant;
 
@@ -88,15 +87,14 @@ impl TuiRunner {
             let mut redraw = self.tick.new_tick();
 
             if let Some(input) = Self::get_input()? {
-                self.handle_key_event(input)?;
-                redraw = true;
+                redraw = self.handle_key_event(input)?;
             }
 
             if redraw {
                 self.tick();
                 self.render_terminal()?;
             }
-            sleep(Duration::from_millis(10));
+            std::thread::sleep(Duration::from_millis(50));
         }
         Ok(())
     }
@@ -191,17 +189,17 @@ impl TuiRunner {
         }
     }
 
-    fn handle_key_event(&mut self, input: Event) -> Result<(), TuiError> {
-        // Handle settings input directly on the renderer
+    fn handle_key_event(&mut self, input: Event) -> Result<bool, TuiError> {
+        let mut redraw = true;
         match self.router().active_page() {
-            Some(Page::Settings) => self.handle_settings(input),
-            Some(Page::Timer) => self.handle_timer(input),
+            Some(Page::Settings) => redraw = self.handle_settings(input),
+            Some(Page::Timer) => redraw = self.handle_timer(input),
             None => self.quit(),
         }
-        Ok(())
+        Ok(redraw)
     }
 
-    fn handle_timer(&mut self, event: Event) {
+    fn handle_timer(&mut self, event: Event) -> bool {
         use KeyCode::*;
         use PomodoroMsg::*;
 
@@ -209,6 +207,7 @@ impl TuiRunner {
             return self.handle_timer_transition(event);
         }
 
+        let mut redraw = true;
         if let Event::Key(key) = event {
             match key.code {
                 Right | Char('l') => {
@@ -237,12 +236,16 @@ impl TuiRunner {
                 Char('/') | Char('?') => {
                     self.timer_mut().toggle_keybinds();
                 }
-                _ => {}
+                _ => redraw = false,
             }
+        } else {
+            redraw = false
         }
+        redraw
     }
 
-    fn handle_timer_transition(&mut self, event: Event) {
+    fn handle_timer_transition(&mut self, event: Event) -> bool {
+        let mut redraw = true;
         if let Event::Key(key) = event {
             match key.code {
                 KeyCode::Enter | KeyCode::Char('y') => {
@@ -250,18 +253,22 @@ impl TuiRunner {
                     self.update_timer(TimerMsg::SetPromptNextSession(false));
                 }
                 KeyCode::Esc | KeyCode::Char('n') => self.quit(),
-                _ => {}
+                _ => redraw = false,
             }
+        } else {
+            redraw = false
         }
+        redraw
     }
 
     /// Handle settings page input directly, mutating renderer state
-    fn handle_settings(&mut self, event: Event) {
+    fn handle_settings(&mut self, event: Event) -> bool {
         // When editing, handle text input
         if self.settings().is_editing() {
             return self.handle_settings_edit(event);
         }
 
+        let mut redraw = true;
         // When navigating, handle navigation input
         use KeyCode::*;
         use SettingsMsg::*;
@@ -301,7 +308,7 @@ impl TuiRunner {
                 Esc => self.router_mut().navigate(Page::Timer),
                 Char('q') => self.quit(),
                 Char('/') | Char('?') => self.settings_mut().toggle_keybinds(),
-                _ => {}
+                _ => redraw = false,
             },
             Event::Mouse(mouse) => match mouse.kind {
                 MouseEventKind::ScrollDown => {
@@ -310,13 +317,15 @@ impl TuiRunner {
                 MouseEventKind::ScrollUp => {
                     let _ = self.update_settings(ScrollDown);
                 }
-                _ => {}
+                _ => redraw = false,
             },
-            _ => {}
+            _ => redraw = false,
         }
+        redraw
     }
 
-    fn handle_settings_edit(&mut self, event: Event) {
+    fn handle_settings_edit(&mut self, event: Event) -> bool {
+        let mut redraw = true;
         if let Event::Key(key) = event
             && let Some(prompt) = self.settings_mut().prompt_state_mut()
         {
@@ -329,9 +338,12 @@ impl TuiRunner {
                 Status::Aborted => {
                     self.update_settings(SettingsMsg::CancelEditing);
                 }
-                _ => {}
+                _ => redraw = false,
             }
+        } else {
+            redraw = false;
         }
+        redraw
     }
 
     fn apply_settings_edit(&mut self) {
@@ -472,7 +484,10 @@ struct TickHandler {
 
 impl TickHandler {
     fn new(tick_rate: Duration) -> Self {
-        Self { last_tick: Instant::now(), tick_rate }
+        Self {
+            last_tick: Instant::now(),
+            tick_rate,
+        }
     }
 
     fn new_tick(&mut self) -> bool {
