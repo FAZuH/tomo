@@ -5,7 +5,7 @@ use crate::config::Config;
 use crate::config::Percentage;
 use crate::ui::prelude::*;
 
-pub const SETTINGS_VIEW_ITEMS: u32 = 16;
+pub const SETTINGS_VIEW_ITEMS: u32 = 17;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum ConfigMsg {
