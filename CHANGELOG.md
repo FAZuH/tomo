@@ -1,3 +1,12 @@
+## [0.2.1](https://github.com/FAZuH/tomo/compare/v0.2.0...v0.2.1) (2026-05-01)
+
+
+### perf
+
+* **tui:** Fix tick timer bug causing high CPU usage ([d36489e](https://github.com/FAZuH/tomo/commit/d36489e37b93fd0b43ff85dd1143152cb3d5721a))
+* **tui:** Improve idle CPU usage ([f74a09f](https://github.com/FAZuH/tomo/commit/f74a09f6a99d6896b060d000572e8e9b84454c46))
+* **tui:** Redraw only when a valid input is pressed ([50c0e1d](https://github.com/FAZuH/tomo/commit/50c0e1ddc46f8e67129886b3298c6151ced8b3da))
+
 ## [0.2.0](https://github.com/FAZuH/tomo/compare/v0.1.7...v0.2.0) (2026-05-01)
 
 
@@ -86,17 +95,4 @@
 ### Code Refactoring
 
 * Rename "notification" to "alarm" ([d923572](https://github.com/FAZuH/tomo/commit/d923572e9de6db6530cee892be9e2964a26c90cf))
-
-## [0.1.4](https://github.com/FAZuH/tomo/compare/v0.1.3...v0.1.4) (2026-04-26)
-
-
-### feat
-
-* **tui:** Add settings save by 's' shortcut ([9bd3f51](https://github.com/FAZuH/tomo/commit/9bd3f512c13c6683410537cd1a50b5555090a5d3))
-* **tui:** Add unsaved changes indicator to settings page ([a2b65cd](https://github.com/FAZuH/tomo/commit/a2b65cd145914181db92c7c84debf6cd6bf9ff8d))
-
-
-### refactor
-
-* Rename logging var to TOMO_LOG ([d825181](https://github.com/FAZuH/tomo/commit/d825181c519b8b29b5834863f90ae1e689fde568))
 
