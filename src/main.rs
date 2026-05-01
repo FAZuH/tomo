@@ -24,7 +24,7 @@ fn runner<'b>(conf: Config, pomo: Pomodoro) -> impl Runner + 'b {
     use tomo::ui::tui::TuiRunner;
     use tomo::ui::tui::view::TuiView;
 
-    let sound = Box::new(AlarmService::new(conf.pomodoro.alarm.clone()));
+    let sound = Box::new(AlarmService::new());
     let view = Box::new(TuiView::new());
     TuiRunner::new(pomo, conf, view, sound).unwrap()
 }
