@@ -7,6 +7,7 @@ pub use settings::TuiSettingsView;
 pub use timer::TimerState;
 pub use timer::TuiTimerView;
 
+use crate::config::Config;
 use crate::ui::StatefulViewRef;
 use crate::ui::router::Page;
 use crate::ui::router::Router;
@@ -52,6 +53,7 @@ pub struct TuiState {
     pub timer: TimerState,
     pub settings: SettingsState,
     pub toast: ToastHandler,
+    pub latest_config_save: Option<Config>,
 }
 
 impl TuiState {
@@ -66,6 +68,22 @@ impl TuiState {
             timer,
             settings,
             toast,
+            latest_config_save: None,
         }
+    }
+
+    /// Snapshot current settings.
+    ///
+    /// Use with [`Self::check_settings_updated`]
+    pub fn snapshot_settings(&mut self) {
+        self.latest_config_save = Some(self.conf().clone())
+    }
+
+    /// Compare current config with when it was latest saved.
+    pub fn check_settings_unsaved(&self) -> bool {
+        if let Some(last) = &self.latest_config_save {
+            return *self.conf() != *last;
+        }
+        true
     }
 }

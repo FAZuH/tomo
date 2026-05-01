@@ -45,9 +45,16 @@ type View = Box<
 
 static REDRAW: AtomicBool = AtomicBool::new(true);
 
+fn redraw() {
+    REDRAW.store(true, Ordering::Release);
+}
+
+fn take_redraw() -> bool {
+    REDRAW.swap(false, Ordering::AcqRel)
+}
+
 pub struct TuiRunner {
     state: TuiState,
-    latest_config_save: Option<Config>,
 
     terminal: Tui,
     view: View,
@@ -75,7 +82,6 @@ impl TuiRunner {
 
         Ok(Self {
             state,
-            latest_config_save: None,
             terminal,
             view,
             sound,
@@ -84,71 +90,47 @@ impl TuiRunner {
     }
 
     fn run_loop(&mut self) -> Result<(), TuiError> {
-        self.snapshot_settings();
+        self.state.snapshot_settings();
 
         while !self.state.router().is_quit() {
-            if take_redraw() {
-                self.render_terminal()?;
-            }
-
-            if self.tick.new_tick() {
-                self.tick();
-                redraw();
-            }
-
-            if event::poll(self.tick.time_until_next())? {
-                while event::poll(Duration::ZERO)? {
-                    let event = event::read()?;
-                    // fix windows sending duplicate KeyDown and KeyUp events
-                    #[cfg(target_os = "windows")]
-                    if let Event::Key(key) = &event {
-                        if key.kind == event::KeyEventKind::Release {
-                            continue;
-                        }
-                    }
-                    self.handle_key_event(event)?;
-                }
-            }
+            self.render_terminal()?;
+            self.tick();
+            self.handle_inputs()?;
         }
         Ok(())
     }
 
     fn render_terminal(&mut self) -> Result<(), TuiError> {
-        self.terminal.draw(|f| {
-            self.state.toast_mut().set_area(f.area());
-            self.view.render_stateful_ref(f, &mut self.state);
-            f.render_widget(&*self.state.toast, f.area());
-        })?;
+        if take_redraw() {
+            self.terminal.draw(|f| {
+                self.view.render_stateful_ref(f, &mut self.state);
+                self.state.toast_mut().set_area(f.area());
+                f.render_widget(&*self.state.toast, f.area());
+            })?;
+        }
         Ok(())
     }
 
     fn tick(&mut self) {
-        self.state.toast.tick();
-        let auto_next = self.should_auto_next();
-        let cmd = self.state.update_pomo(PomodoroMsg::Tick { auto_next });
+        if self.tick.new_tick() {
+            self.state.toast.tick();
+            let auto_next = self.should_auto_next();
+            let cmd = self.state.update_pomo(PomodoroMsg::Tick { auto_next });
 
-        self.handle_pomodoro_cmd(cmd);
-    }
-
-    fn handle_pomodoro_cmd(&mut self, cmd: PomodoroCmd) {
-        match cmd {
-            PomodoroCmd::None => {}
-            PomodoroCmd::PromptNextSession => {
-                if !self.state.timer().prompt_transition() {
-                    // only runs on once per session
-                    self.on_session_end();
-                }
-                self.state
-                    .update_timer(TimerMsg::SetPromptNextSession(true));
-            }
-            PomodoroCmd::NextSession => {
-                self.on_session_end();
-                self.transition();
-            }
-            PomodoroCmd::SessionContinued => {}
+            self.handle_pomodoro_cmd(cmd);
+            redraw();
         }
     }
+}
 
+// ---------------------------------------------------------
+//  ___ ___ _____   _____ ___ ___
+// / __| __| _ \ \ / /_ _/ __| __|
+// \__ \ _||   /\ V / | | (__| _|
+// |___/___|_|_\ \_/ |___\___|___|
+// ---------------------------------------------------------
+
+impl TuiRunner {
     fn on_session_end(&mut self) {
         self.run_hooks();
         self.play_sound();
@@ -182,18 +164,31 @@ impl TuiRunner {
             }
         }
     }
+}
 
-    fn transition(&mut self) {
-        self.state.update_pomo(PomodoroMsg::NextState);
-    }
+// ---------------------------------------------------------
+//  ___ _  _ ___ _   _ _____
+// |_ _| \| | _ \ | | |_   _|
+//  | || .` |  _/ |_| | | |
+// |___|_|\_|_|  \___/  |_|
+// ---------------------------------------------------------
 
-    fn should_auto_next(&self) -> bool {
-        let timer = &self.state.conf().pomodoro.timer;
-        match self.state.pomo().mode() {
-            Mode::Focus => timer.auto_focus,
-            Mode::LongBreak => timer.auto_long,
-            Mode::ShortBreak => timer.auto_short,
+impl TuiRunner {
+    fn handle_inputs(&mut self) -> Result<(), TuiError> {
+        if event::poll(self.tick.time_until_next())? {
+            while event::poll(Duration::ZERO)? {
+                let event = event::read()?;
+                // fix windows sending duplicate KeyDown and KeyUp events
+                #[cfg(target_os = "windows")]
+                if let Event::Key(key) = &event {
+                    if key.kind == event::KeyEventKind::Release {
+                        continue;
+                    }
+                }
+                self.handle_key_event(event)?;
+            }
         }
+        Ok(())
     }
 
     fn handle_key_event(&mut self, input: Event) -> Result<(), TuiError> {
@@ -340,6 +335,47 @@ impl TuiRunner {
             }
         }
     }
+}
+
+// ---------------------------------------------------------
+//  ___ _____ _ _____ ___    ___  ___ ___ ___    _ _____ ___ ___  _  _ ___
+// / __|_   _/_\_   _| __|  / _ \| _ \ __| _ \  /_\_   _|_ _/ _ \| \| / __|
+// \__ \ | |/ _ \| | | _|  | (_) |  _/ _||   / / _ \| |  | | (_) | .` \__ \
+// |___/ |_/_/ \_\_| |___|  \___/|_| |___|_|_\/_/ \_\_| |___\___/|_|\_|___/
+// ---------------------------------------------------------
+
+impl TuiRunner {
+    fn transition(&mut self) {
+        self.state.update_pomo(PomodoroMsg::NextState);
+    }
+
+    fn should_auto_next(&self) -> bool {
+        let timer = &self.state.conf().pomodoro.timer;
+        match self.state.pomo().mode() {
+            Mode::Focus => timer.auto_focus,
+            Mode::LongBreak => timer.auto_long,
+            Mode::ShortBreak => timer.auto_short,
+        }
+    }
+
+    fn handle_pomodoro_cmd(&mut self, cmd: PomodoroCmd) {
+        match cmd {
+            PomodoroCmd::None => {}
+            PomodoroCmd::PromptNextSession => {
+                if !self.state.timer().prompt_transition() {
+                    // only runs on once per session
+                    self.on_session_end();
+                }
+                self.state
+                    .update_timer(TimerMsg::SetPromptNextSession(true));
+            }
+            PomodoroCmd::NextSession => {
+                self.on_session_end();
+                self.transition();
+            }
+            PomodoroCmd::SessionContinued => {}
+        }
+    }
 
     fn apply_settings_edit(&mut self) {
         let selected = self.state.settings().selected();
@@ -352,7 +388,7 @@ impl TuiRunner {
         };
 
         self.state.update_conf(msg);
-        let is_unsaved = self.check_settings_unsaved();
+        let is_unsaved = self.state.check_settings_unsaved();
         self.state
             .update_settings(SettingsMsg::SetUnsavedChanges(is_unsaved));
     }
@@ -388,7 +424,7 @@ impl TuiRunner {
             Ok(()) => {
                 self.state
                     .update_settings(SettingsMsg::SetUnsavedChanges(false));
-                self.snapshot_settings();
+                self.state.snapshot_settings();
                 self.show_toast("Settings saved!", ToastType::Success);
             }
             Err(e) => {
@@ -397,25 +433,19 @@ impl TuiRunner {
         }
     }
 
-    /// Compare current config with when it was latest saved.
-    fn check_settings_unsaved(&self) -> bool {
-        if let Some(last) = &self.latest_config_save {
-            return *self.state.conf() != *last;
-        }
-        true
-    }
-
-    /// Snapshot current settings.
-    ///
-    /// Use with [`Self::check_settings_updated`]
-    fn snapshot_settings(&mut self) {
-        self.latest_config_save = Some(self.state.conf().clone())
-    }
-
     fn quit(&mut self) {
         self.state.router_mut().navigate(Navigation::Quit);
     }
+}
 
+// ---------------------------------------------------------
+//  ___  _   ___  ___ ___
+// | _ \/_\ | _ \/ __| __|
+// |  _/ _ \|   /\__ \ _|
+// |_|/_/ \_\_|_\|___/___|
+// ---------------------------------------------------------
+
+impl TuiRunner {
     fn parse_path(&mut self, s: impl AsRef<str>) -> Option<PathBuf> {
         let s = s.as_ref();
         if s.is_empty() {
@@ -460,13 +490,12 @@ impl TuiRunner {
     }
 }
 
-fn redraw() {
-    REDRAW.store(true, Ordering::Release);
-}
-
-fn take_redraw() -> bool {
-    REDRAW.swap(false, Ordering::AcqRel)
-}
+// _________________________________________________________
+//  ___ _____ _ _____ ___
+// / __|_   _/_\_   _| __|
+// \__ \ | |/ _ \| | | _|
+// |___/ |_/_/ \_\_| |___|
+// ---------------------------------------------------------
 
 impl TuiState {
     // Toast
@@ -531,6 +560,13 @@ impl TuiState {
         self.conf_mut().update(msg)
     }
 }
+
+// ---------------------------------------------------------
+//  _____ ___ ___ _  __
+// |_   _|_ _/ __| |/ /
+//   | |  | | (__| ' <
+//   |_| |___\___|_|\_\
+// ---------------------------------------------------------
 
 struct TickHandler {
     last_tick: Instant,
