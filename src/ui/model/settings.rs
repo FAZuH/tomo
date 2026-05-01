@@ -172,6 +172,15 @@ impl SettingsItem {
         Self::percentages().contains(self)
     }
 
+    pub fn is_path(&self) -> bool {
+        self.paths().contains(self)
+    }
+
+    pub fn paths(&self) -> Vec<Self> {
+        use SettingsItem::*;
+        vec![AlarmPathFocus, AlarmPathLong, AlarmPathShort]
+    }
+
     fn toggles() -> Vec<Self> {
         use SettingsItem::*;
         vec![

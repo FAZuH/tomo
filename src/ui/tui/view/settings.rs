@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::path::Path;
 use std::sync::LazyLock;
 
 use ratatui::layout::Flex;
@@ -8,6 +9,7 @@ use ratatui::widgets::Block;
 use ratatui::widgets::Borders;
 use ratatui::widgets::Clear;
 use ratatui::widgets::Paragraph;
+use tui_widgets::prompts::State as _;
 use tui_widgets::prompts::prelude::*;
 use tui_widgets::scrollview::ScrollView;
 use tui_widgets::scrollview::ScrollbarVisibility;
@@ -107,12 +109,15 @@ impl TuiSettingsView {
     }
 
     fn prompt(&self, frame: &mut Frame, area: Rect, model: &mut SettingsModel) {
-        // Render prompt overlay
         if let Some(ref mut prompt) = model.prompt_state_mut() {
             let buf = frame.buffer_mut();
             let popup_width = 50.min(area.width.saturating_sub(4));
-            let popup_height = 3;
 
+            let inner_width = popup_width.saturating_sub(2).max(1);
+            let text_len = prompt.text_state.value().chars().count() as u16;
+            let prefix_len = 5; // "?  › "
+            let lines_needed = (text_len + prefix_len) / inner_width + 1;
+            let popup_height = (lines_needed + 2).max(3).min(area.height);
             let vertical = Layout::vertical([Constraint::Length(popup_height)]).flex(Flex::Center);
             let horizontal =
                 Layout::horizontal([Constraint::Length(popup_width)]).flex(Flex::Center);
@@ -256,10 +261,18 @@ impl TuiSettingsView {
         value: impl ToString,
         rows: &mut Vec<SectionRow>,
     ) {
+        let value = value.to_string();
         rows.push(SectionRow::Input {
             label: item.label().into(),
-            value: value.to_string(),
             is_selected: model.selected() == item,
+            warning: {
+                if item.is_path() {
+                    !Path::new(&value).exists()
+                } else {
+                    false
+                }
+            },
+            value,
         });
     }
 
@@ -307,6 +320,7 @@ enum SectionRow {
         label: String,
         value: String,
         is_selected: bool,
+        warning: bool,
     },
     Checkbox {
         label: String,
@@ -388,9 +402,16 @@ impl Widget for SectionRow {
                 label,
                 value,
                 is_selected,
+                warning,
             } => {
                 let bg = if is_selected {
                     Style::default().bg(Color::DarkGray)
+                } else {
+                    Style::default()
+                };
+
+                let fg = if warning {
+                    Style::default().fg(Color::LightRed)
                 } else {
                     Style::default()
                 };
@@ -400,7 +421,7 @@ impl Widget for SectionRow {
                         format!(" {label}: "),
                         Style::default().add_modifier(Modifier::DIM).patch(bg),
                     ),
-                    Span::styled(value, Style::default().patch(bg)),
+                    Span::styled(value, Style::default().patch(bg).patch(fg)),
                 ]);
                 Paragraph::new(line).render(area, buf);
             }
