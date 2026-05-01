@@ -84,27 +84,25 @@ impl TuiRunner {
         self.snapshot_settings();
 
         while !self.router().is_quit() {
-            let mut redraw = self.tick.new_tick();
+            let mut redraw = false;
 
-            if let Some(input) = Self::get_input()? {
-                redraw = self.handle_key_event(input)?;
+            if self.tick.new_tick() {
+                self.tick();
+                redraw = true;
+            }
+
+            if event::poll(self.tick.time_until_next())? {
+                while event::poll(Duration::ZERO)? {
+                    let event = event::read()?;
+                    redraw |= self.handle_key_event(event)?;
+                }
             }
 
             if redraw {
-                self.tick();
                 self.render_terminal()?;
             }
-            std::thread::sleep(Duration::from_millis(50));
         }
         Ok(())
-    }
-
-    fn get_input() -> Result<Option<Event>, TuiError> {
-        if event::poll(Duration::from_millis(10))? {
-            Ok(Some(event::read()?))
-        } else {
-            Ok(None)
-        }
     }
 
     fn render_terminal(&mut self) -> Result<(), TuiError> {
@@ -498,6 +496,11 @@ impl TickHandler {
         } else {
             false
         }
+    }
+
+    fn time_until_next(&self) -> Duration {
+        let elapsed = Instant::now().duration_since(self.last_tick);
+        self.tick_rate.saturating_sub(elapsed)
     }
 }
 
