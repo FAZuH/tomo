@@ -98,6 +98,13 @@ impl TuiRunner {
             if event::poll(self.tick.time_until_next())? {
                 while event::poll(Duration::ZERO)? {
                     let event = event::read()?;
+                    // fix windows sending duplicate KeyDown and KeyUp events
+                    #[cfg(target_os = "windows")]
+                    if let Event::Key(key) = &event {
+                        if key.kind == event::KeyEventKind::Release {
+                            continue;
+                        }
+                    }
                     redraw |= self.handle_key_event(event)?;
                 }
             }
