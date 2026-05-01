@@ -3,12 +3,11 @@ use std::sync::LazyLock;
 
 use ratatui::layout::Flex;
 use ratatui::prelude::*;
+use ratatui::symbols::border;
 use ratatui::widgets::Block;
 use ratatui::widgets::Borders;
 use ratatui::widgets::Clear;
 use ratatui::widgets::Paragraph;
-use tui_widgets::big_text::BigText;
-use tui_widgets::big_text::PixelSize;
 use tui_widgets::prompts::prelude::*;
 use tui_widgets::scrollview::ScrollView;
 use tui_widgets::scrollview::ScrollbarVisibility;
@@ -54,51 +53,59 @@ impl<'a> StatefulViewRef<Canvas<'a, '_>> for TuiSettingsView {
         let buf = canvas.buffer_mut();
         let SettingsState { model, conf } = state;
 
+        // Split area for scroll view and help bar
+        let [content_area, help_area] =
+            Layout::vertical([Constraint::Fill(1), Constraint::Length(3)]).areas(area);
+
         // Reserve space for scrollbar and padding
-        let content_width = area.width.saturating_sub(4).max(46);
+        let content_width = content_area.width.saturating_sub(2).max(46);
 
         // Build sections with proper layout
         let sections = self.build_sections(model, &conf.pomodoro);
 
-        // Calculate total height: title (4) + spacing (1) + sections + padding (2)
-        let sections_height: u16 = sections.iter().map(|s| s.height).sum();
-        let total_height: u16 = 4 + 1 + sections_height + 2;
-
         // Create scroll view with full content size
-        let mut scroll_view = ScrollView::new(Size::new(content_width, total_height))
+        let mut scroll_view = ScrollView::new(Size::new(content_width, content_area.height))
             .vertical_scrollbar_visibility(ScrollbarVisibility::Automatic);
 
-        // Render title at top
-        let title_area = Rect::new(0, 0, content_width, 4);
-        self.title(&mut scroll_view, title_area);
-
         // Render unsaved changes indicator in the spacing row between title and sections
-        let indicator_area = Rect::new(0, 4, content_width, 1);
+        let indicator_area = Rect::new(0, 0, content_width, 1);
         self.save_indicator(&mut scroll_view, indicator_area, model);
 
         // Render sections with proper spacing
-        let mut y = 5u16; // Start after title + 1 row spacing
+        let mut y = 2u16;
+        let last = sections.last().unwrap().section;
         for section in sections {
-            let section_area = Rect::new(0, y, content_width, section.height);
+            let section_area = if section.section == last {
+                Rect::new(0, y, content_width, content_area.height)
+            } else {
+                Rect::new(0, y, content_width, section.height)
+            };
             y += section.height;
             scroll_view.render_widget(section, section_area);
         }
 
-        scroll_view.render(area, buf, model.scroll_state_mut());
+        scroll_view.render(content_area, buf, model.scroll_state_mut());
 
-        // Render prompt popup
+        // Render help bar at bottom
+        self.keybinds(help_area, buf, model);
+
+        // Render prompt popup (over full area, including help bar)
         self.prompt(canvas, area, model);
     }
 }
 
 impl TuiSettingsView {
-    fn title(&self, scroll: &mut ScrollView, area: Rect) {
-        scroll.render_widget(TITLE.clone(), area);
-    }
-
     fn save_indicator(&self, scroll: &mut ScrollView, area: Rect, model: &mut SettingsModel) {
         if model.has_unsaved_changes() {
             scroll.render_widget(SAVED_INDICATOR.clone(), area);
+        }
+    }
+
+    fn keybinds(&self, area: Rect, buf: &mut Buffer, model: &SettingsModel) {
+        if model.show_keybinds() {
+            KEYBINDS_ON.clone().render(area, buf);
+        } else {
+            KEYBINDS_OFF.clone().render(area, buf);
         }
     }
 
@@ -139,10 +146,14 @@ impl TuiSettingsView {
         sections
     }
 
-    fn build_timer_section(&self, m: &SettingsModel, conf: &Timers, sections: &mut Vec<Section>) {
+    fn build_timer_section(
+        &self,
+        model: &SettingsModel,
+        conf: &Timers,
+        sections: &mut Vec<Section>,
+    ) {
         use SettingsItem::*;
         // Build Pomodoro Timer section
-        let label = "󰔛 Pomodoro Timer";
         let mut r = Vec::new();
 
         // Durations subsection
@@ -151,25 +162,25 @@ impl TuiSettingsView {
         }
         r.push(SectionRow::SubSectionHeader("Durations".into()));
         self.add_inpt(
-            m,
+            model,
             TimerFocus,
             format!("{}", conf.focus.as_secs() / 60),
             &mut r,
         );
         self.add_inpt(
-            m,
+            model,
             TimerShort,
             format!("{}", conf.short.as_secs() / 60),
             &mut r,
         );
         self.add_inpt(
-            m,
+            model,
             TimerLong,
             format!("{}", conf.long.as_secs() / 60),
             &mut r,
         );
         self.add_inpt(
-            m,
+            model,
             TimerLongInterval,
             format!("{}", conf.long_interval),
             &mut r,
@@ -180,14 +191,15 @@ impl TuiSettingsView {
             r.push(SectionRow::Blank);
         }
         r.push(SectionRow::SubSectionHeader("Auto Start".into()));
-        self.add_box(m, TimerAutoFocus, conf.auto_focus, &mut r);
-        self.add_box(m, TimerAutoShort, conf.auto_short, &mut r);
-        self.add_box(m, TimerAutoLong, conf.auto_long, &mut r);
+        self.add_box(model, TimerAutoFocus, conf.auto_focus, &mut r);
+        self.add_box(model, TimerAutoShort, conf.auto_short, &mut r);
+        self.add_box(model, TimerAutoLong, conf.auto_long, &mut r);
 
         let height = 2 + r.iter().map(|r| r.height()).sum::<u16>();
         sections.push(Section {
-            title: label.into(),
-            color: SettingsSection::Timer,
+            title: "[1] Pomodoro Timer".into(),
+            section: SettingsSection::Timer,
+            sel_item: model.selected(),
             height,
             rows: r,
         });
@@ -201,7 +213,6 @@ impl TuiSettingsView {
     ) {
         use SettingsItem::*;
         // Build Command Hooks section
-        let label = "󰛢 Command Hooks";
         let mut r = Vec::new();
 
         // Hooks subsection
@@ -215,8 +226,9 @@ impl TuiSettingsView {
 
         let height = 2 + r.iter().map(|r| r.height()).sum::<u16>();
         sections.push(Section {
-            title: label.into(),
-            color: SettingsSection::Hook,
+            title: "[2] Command Hooks".into(),
+            section: SettingsSection::Hook,
+            sel_item: model.selected(),
             height,
             rows: r,
         });
@@ -246,8 +258,9 @@ impl TuiSettingsView {
 
         let height = 2 + r.iter().map(|r| r.height()).sum::<u16>();
         sections.push(Section {
-            title: "󰕾 Alarm".into(),
-            color: SettingsSection::Alarm,
+            title: "[3] Alarm".into(),
+            section: SettingsSection::Alarm,
+            sel_item: model.selected(),
             height,
             rows: r,
         });
@@ -286,9 +299,20 @@ impl TuiSettingsView {
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct Section {
     title: String,
-    color: SettingsSection,
+    section: SettingsSection,
+    sel_item: SettingsItem,
     height: u16,
     rows: Vec<SectionRow>,
+}
+
+impl Section {
+    fn border_color(&self) -> Color {
+        if self.sel_item.section() == self.section {
+            Color::Green
+        } else {
+            Color::White
+        }
+    }
 }
 
 /// Individual row within a section
@@ -322,12 +346,17 @@ impl Widget for Section {
     where
         Self: Sized,
     {
+        let style = Style::default()
+            .fg(Color::Green)
+            .add_modifier(Modifier::BOLD);
+
         // Create block with border
         let block = Block::default()
             .title(self.title.clone())
-            .title_style(self.color.title_style())
+            .title_style(style)
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(self.color.border_color()));
+            .border_set(border::ROUNDED)
+            .border_style(Style::default().fg(self.border_color()));
 
         // Get inner area for content
         let inner = block.inner(area);
@@ -355,13 +384,21 @@ impl Widget for SectionRow {
         match self {
             SectionRow::Blank => Line::from("").render(area, buf),
             SectionRow::SubSectionHeader(label) => {
-                let line = Line::from(Span::styled(
-                    format!("▸ {} ", label),
-                    Style::default()
-                        .fg(Color::White)
-                        .add_modifier(Modifier::BOLD)
-                        .add_modifier(Modifier::UNDERLINED),
-                ));
+                let line = Line::from(vec![
+                    Span::styled(
+                        " ",
+                        Style::default()
+                            .fg(Color::White)
+                            .add_modifier(Modifier::BOLD),
+                    ),
+                    Span::styled(
+                        format!("▸{label} "),
+                        Style::default()
+                            .fg(Color::White)
+                            .add_modifier(Modifier::BOLD)
+                            .add_modifier(Modifier::UNDERLINED),
+                    ),
+                ]);
                 Paragraph::new(line).render(area, buf);
             }
             SectionRow::Input {
@@ -377,7 +414,7 @@ impl Widget for SectionRow {
 
                 let line = Line::from(vec![
                     Span::styled(
-                        format!("{}: ", label),
+                        format!(" {label}: "),
                         Style::default().add_modifier(Modifier::DIM).patch(bg),
                     ),
                     Span::styled(value, Style::default().patch(bg)),
@@ -395,36 +432,21 @@ impl Widget for SectionRow {
                     Style::default()
                 };
 
+                let style = Style::default().fg(Color::Cyan).patch(bg);
                 let checkbox = if value {
-                    Span::styled("[x]", Style::default().fg(Color::Cyan).patch(bg))
+                    Span::styled(" [x] ", style)
                 } else {
-                    Span::styled("[ ]", Style::default().fg(Color::Cyan).patch(bg))
+                    Span::styled(" [ ] ", style)
                 };
 
                 let line = Line::from(vec![
                     checkbox,
-                    Span::styled(" ", bg),
-                    Span::styled(label.clone(), bg),
+                    Span::styled("", bg),
+                    Span::styled(label.clone(), bg).add_modifier(Modifier::DIM),
                 ]);
                 Paragraph::new(line).render(area, buf);
             }
         }
-    }
-}
-
-impl SettingsSection {
-    fn border_color(self) -> Color {
-        match self {
-            SettingsSection::Timer => Color::Cyan,
-            SettingsSection::Hook => Color::Yellow,
-            SettingsSection::Alarm => Color::Magenta,
-        }
-    }
-
-    fn title_style(self) -> Style {
-        Style::default()
-            .fg(self.border_color())
-            .add_modifier(Modifier::BOLD)
     }
 }
 
@@ -433,17 +455,49 @@ pub struct SettingsPrompt {
     pub label: String,
 }
 
-static TITLE: LazyLock<BigText<'static>> = LazyLock::new(|| {
-    BigText::builder()
-        .pixel_size(PixelSize::Quadrant)
-        .style(
-            Style::default()
-                .fg(Color::Cyan)
-                .add_modifier(Modifier::BOLD),
-        )
-        .lines(vec!["Settings".into()])
-        .centered()
-        .build()
+static KEYBINDS_ON: LazyLock<Paragraph<'static>> = LazyLock::new(|| {
+    let dim = Style::default().dim();
+    let bright = Style::default();
+    let sep = Span::styled(" • ", dim);
+    Paragraph::new(vec![
+        Line::from(vec![
+            Span::styled("↑/↓/j/k", bright),
+            Span::styled(": Navigate", dim),
+            sep.clone(),
+            Span::styled("Tab", bright),
+            Span::styled(": Sections", dim),
+            sep.clone(),
+            Span::styled("1/2/3", bright),
+            Span::styled(": Jump", dim),
+        ]),
+        Line::from(vec![
+            Span::styled("Space/Enter", bright),
+            Span::styled(": Toggle", dim),
+            sep.clone(),
+            Span::styled("Enter", bright),
+            Span::styled(": Edit", dim),
+            sep.clone(),
+            Span::styled("s", bright),
+            Span::styled(": Save", dim),
+            sep.clone(),
+            Span::styled("Esc", bright),
+            Span::styled(": Back", dim),
+            sep.clone(),
+            Span::styled("q", bright),
+            Span::styled(": Quit", dim),
+            sep.clone(),
+            Span::styled("?", bright),
+            Span::styled(": Disable Help", dim),
+        ]),
+    ])
+    .alignment(Alignment::Center)
+});
+
+static KEYBINDS_OFF: LazyLock<Paragraph<'static>> = LazyLock::new(|| {
+    let dim = Style::default().dim();
+    let bright = Style::default();
+    let line = Line::from(vec![Span::styled("?", bright), Span::styled(": Help", dim)]);
+    Paragraph::new(line).alignment(Alignment::Center)
 });
 
 static SAVED_INDICATOR: LazyLock<Paragraph<'static>> = LazyLock::new(|| {

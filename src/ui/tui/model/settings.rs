@@ -10,16 +10,22 @@ use crate::ui::Updateable;
 use crate::ui::tui::view::settings::SettingsPrompt;
 use crate::ui::update::config::SETTINGS_VIEW_ITEMS;
 
+static SETTINGS_SECTIONS: u32 = 3;
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum SettingsMsg {
     SelectUp,
     SelectDown,
+    SectionPrev,
+    SectionNext,
+    SectionSelect(u32),
     ScrollUp,
     ScrollDown,
     // StartEditing(PomodoroConfig),
     CancelEditing,
     TakeEditValue,
     SetUnsavedChanges(bool),
+    SetShowKeybinds(bool),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -151,7 +157,7 @@ impl SettingsItem {
     }
 
     pub fn section(&self) -> SettingsSection {
-        SettingsSection::from_index(self.index()).unwrap()
+        SettingsSection::from_item_index(self.index()).unwrap()
     }
 
     pub fn is_toggle(&self) -> bool {
@@ -178,7 +184,7 @@ pub enum SettingsSection {
 }
 
 impl SettingsSection {
-    pub fn from_index(idx: u32) -> Option<Self> {
+    pub fn from_item_index(idx: u32) -> Option<Self> {
         use SettingsSection::*;
         let ret = match idx {
             0..=6 => Timer,
@@ -189,12 +195,41 @@ impl SettingsSection {
         Some(ret)
     }
 
-    pub fn label(&self) -> &'static str {
+    pub fn from_index(idx: u32) -> Option<Self> {
+        use SettingsSection::*;
+        let ret = match idx {
+            0 => Timer,
+            1 => Hook,
+            2 => Alarm,
+            _ => return None,
+        };
+        Some(ret)
+    }
+
+    pub fn index(&self) -> u32 {
         use SettingsSection::*;
         match self {
-            Timer => "Timer",
-            Hook => "Hook",
-            Alarm => "Alarm",
+            Timer => 0,
+            Hook => 1,
+            Alarm => 2,
+        }
+    }
+
+    pub fn item_begin_idx(&self) -> u32 {
+        match self.index() {
+            0 => 0,
+            1 => 7,
+            2 => 10,
+            _ => panic!("label called on invalid section"),
+        }
+    }
+
+    pub fn label(&self) -> &'static str {
+        match self.index() {
+            0 => "Timer",
+            1 => "Hook",
+            2 => "Alarm",
+            _ => panic!("label called on invalid section"),
         }
     }
 }
@@ -210,6 +245,7 @@ pub struct SettingsModel {
     scroll_state: ScrollViewState,
     prompt: Option<SettingsPrompt>,
     has_unsaved_changes: bool,
+    show_keybinds: bool,
 }
 
 impl Updateable for SettingsModel {
@@ -223,6 +259,9 @@ impl Updateable for SettingsModel {
         match msg {
             SelectUp => self.select_up(),
             SelectDown => self.select_down(),
+            SectionPrev => self.prev_section(),
+            SectionNext => self.next_section(),
+            SectionSelect(idx) => self.select_section(SettingsSection::from_index(idx).unwrap()),
             ScrollUp => self.scroll_up(),
             ScrollDown => self.scroll_down(),
             CancelEditing => self.cancel_editing(),
@@ -232,6 +271,7 @@ impl Updateable for SettingsModel {
                 );
             }
             SetUnsavedChanges(v) => self.has_unsaved_changes = v,
+            SetShowKeybinds(v) => self.show_keybinds = v,
         }
 
         cmd
@@ -245,6 +285,7 @@ impl SettingsModel {
             scroll_state: ScrollViewState::default(),
             prompt: None,
             has_unsaved_changes: false,
+            show_keybinds: false,
         }
     }
 
@@ -278,11 +319,21 @@ impl SettingsModel {
         self.prompt.is_some()
     }
 
+    pub fn show_keybinds(&self) -> bool {
+        self.show_keybinds
+    }
+
+    pub fn toggle_keybinds(&mut self) {
+        let new = !self.show_keybinds;
+        self.update(SettingsMsg::SetShowKeybinds(new));
+    }
+
     pub fn start_editing_for_field(&mut self, config: &PomodoroConfig) {
         let alarm = &config.alarm;
         let hook = &config.hook;
         let timer = &config.timer;
-        let value = match self.selected.index() {
+        let idx = self.selected.index();
+        let mut value = match idx {
             0 => format!("{}", timer.focus.as_secs() / 60),
             1 => format!("{}", timer.short.as_secs() / 60),
             2 => format!("{}", timer.long.as_secs() / 60),
@@ -293,11 +344,15 @@ impl SettingsModel {
             10 => alarm.focus.path(),
             11 => alarm.short.path(),
             12 => alarm.long.path(),
-            13 => alarm.focus.path(),
-            14 => alarm.short.path(),
-            15 => alarm.long.path(),
+            13 => alarm.focus.volume(),
+            14 => alarm.short.volume(),
+            15 => alarm.long.volume(),
             _ => return, // Cannot edit toggles or out of bounds
         };
+
+        if (13..=15).contains(&idx) {
+            value = value[..value.len() - 1].to_string();
+        }
 
         let value_len = value.len();
         let mut text_state = TextState::new()
@@ -311,7 +366,7 @@ impl SettingsModel {
         });
     }
 
-    /// Move selection up
+    /// Select item up
     fn select_up(&mut self) {
         let idx = self
             .selected
@@ -321,7 +376,7 @@ impl SettingsModel {
         self.selected = SettingsItem::from_index(idx).unwrap();
     }
 
-    /// Move selection down
+    /// Select item down
     fn select_down(&mut self) {
         let idx = self
             .selected
@@ -329,6 +384,24 @@ impl SettingsModel {
             .saturating_add(1)
             .clamp(0, SETTINGS_VIEW_ITEMS - 1); // 13 items total
         self.selected = SettingsItem::from_index(idx).unwrap();
+    }
+
+    fn prev_section(&mut self) {
+        let idx = (self.selected.section().index() + SETTINGS_SECTIONS - 1) % SETTINGS_SECTIONS;
+        self.selected =
+            SettingsItem::from_index(SettingsSection::from_index(idx).unwrap().item_begin_idx())
+                .unwrap();
+    }
+
+    fn next_section(&mut self) {
+        let idx = (self.selected.section().index() + 1) % SETTINGS_SECTIONS;
+        self.selected =
+            SettingsItem::from_index(SettingsSection::from_index(idx).unwrap().item_begin_idx())
+                .unwrap();
+    }
+
+    fn select_section(&mut self, section: SettingsSection) {
+        self.selected = SettingsItem::from_index(section.item_begin_idx()).unwrap();
     }
 
     /// Scroll up by one row

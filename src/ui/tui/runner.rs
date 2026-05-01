@@ -113,6 +113,7 @@ impl TuiRunner {
 
     fn render_terminal(&mut self) -> Result<(), TuiError> {
         self.terminal.draw(|f| {
+            self.toast.set_area(f.area());
             self.view.render_stateful_ref(f, &mut self.state);
             f.render_widget(&*self.toast, f.area());
         })?;
@@ -165,6 +166,7 @@ impl TuiRunner {
         self.toast.show_toast(
             ToastBuilder::new(message.into())
                 .toast_type(r#type)
+                .deduplicate(true)
                 .position(ToastPosition::TopRight),
         );
     }
@@ -211,13 +213,13 @@ impl TuiRunner {
 
         if let Event::Key(key) = event {
             match key.code {
-                Left | Char('h') => {
+                Right | Char('l') => {
                     self.update_pomo(Subtract(Duration::from_secs(30)));
                 }
                 Down | Char('j') => {
                     self.update_pomo(Subtract(Duration::from_secs(60)));
                 }
-                Right | Char('l') => {
+                Left | Char('h') => {
                     self.update_pomo(Add(Duration::from_secs(30)));
                 }
                 Up | Char('k') => {
@@ -234,6 +236,9 @@ impl TuiRunner {
                 }
                 Char('q') => self.quit(),
                 Char('s') => self.router_mut().navigate(Page::Settings),
+                Char('/') | Char('?') => {
+                    self.timer_mut().toggle_keybinds();
+                }
                 _ => {}
             }
         }
@@ -267,6 +272,12 @@ impl TuiRunner {
                 Up | Char('k') => {
                     let _ = self.update_settings(SelectUp);
                 }
+                BackTab => {
+                    let _ = self.update_settings(SectionPrev);
+                }
+                Tab => {
+                    let _ = self.update_settings(SectionNext);
+                }
                 Down | Char('j') => {
                     let _ = self.update_settings(SelectDown);
                 }
@@ -278,10 +289,20 @@ impl TuiRunner {
                         self.settings_mut().start_editing_for_field(pomo)
                     }
                 }
+                Char('1') => {
+                    let _ = self.update_settings(SectionSelect(0));
+                }
+                Char('2') => {
+                    let _ = self.update_settings(SectionSelect(1));
+                }
+                Char('3') => {
+                    let _ = self.update_settings(SectionSelect(2));
+                }
                 Char('s') => self.save_settings(),
                 Char(' ') if self.settings().selected().is_toggle() => self.apply_settings_edit(),
                 Esc => self.router_mut().navigate(Page::Timer),
                 Char('q') => self.quit(),
+                Char('/') | Char('?') => self.settings_mut().toggle_keybinds(),
                 _ => {}
             },
             Event::Mouse(mouse) => match mouse.kind {

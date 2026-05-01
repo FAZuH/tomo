@@ -3,6 +3,7 @@ use crate::ui::Updateable;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TimerMsg {
     SetPromptNextSession(bool),
+    SetShowKeybinds(bool),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -10,9 +11,10 @@ pub enum TimerCmd {
     None,
 }
 
-#[derive(Debug, Default, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Default)]
 pub struct TimerModel {
     prompt_transition: bool,
+    show_keybinds: bool,
 }
 
 impl Updateable for TimerModel {
@@ -23,6 +25,7 @@ impl Updateable for TimerModel {
         use TimerMsg::*;
         match msg {
             SetPromptNextSession(v) => self.prompt_transition = v,
+            SetShowKeybinds(v) => self.show_keybinds = v,
         }
         TimerCmd::None
     }
@@ -35,5 +38,14 @@ impl TimerModel {
 
     pub fn prompt_transition(&self) -> bool {
         self.prompt_transition
+    }
+
+    pub fn show_keybinds(&self) -> bool {
+        self.show_keybinds
+    }
+
+    pub fn toggle_keybinds(&mut self) {
+        let new = !self.show_keybinds;
+        self.update(TimerMsg::SetShowKeybinds(new));
     }
 }
