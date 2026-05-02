@@ -36,7 +36,7 @@ CREATE TABLE tasks (
 
 CREATE TABLE sessions (
     id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-    task_id INTEGER NOT NULL,
+    task_id INTEGER,
     -- Time this session was started
     start_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     -- Time this session was updated. Used for crash recovery
