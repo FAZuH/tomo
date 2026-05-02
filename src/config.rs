@@ -14,15 +14,18 @@ use crate::utils;
 pub struct Config {
     pub pomodoro: PomodoroConfig,
     pub logs_path: PathBuf,
+    pub db_path: PathBuf,
 }
 
 impl Default for Config {
     fn default() -> Self {
         let conf_dir = utils::conf_dir();
         let logs_path = conf_dir.join("logs");
+        let db_path = conf_dir.join("data.db");
         Self {
             pomodoro: Default::default(),
             logs_path,
+            db_path,
         }
     }
 }

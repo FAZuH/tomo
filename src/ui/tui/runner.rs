@@ -6,6 +6,7 @@ use crossterm::event::Event;
 use crossterm::event::KeyCode;
 use crossterm::event::MouseEventKind;
 use crossterm::event::{self};
+use log::debug;
 use ratatui_toaster::ToastBuilder;
 use ratatui_toaster::ToastPosition;
 use ratatui_toaster::ToastType as ToasterType;
@@ -16,6 +17,9 @@ use crate::config::Alarm;
 use crate::config::Config;
 use crate::model::Mode;
 use crate::model::Pomodoro;
+use crate::repo::Repos;
+use crate::repo::model::PomodoroState;
+use crate::repo::model::Session;
 use crate::service::SoundService;
 use crate::service::cmd_runner::run_cmds;
 use crate::service::notify::notify;
@@ -26,20 +30,22 @@ use crate::ui::tui::backend::Tui;
 use crate::ui::tui::toast::ToastHandler;
 use crate::ui::tui::view::*;
 
-type Sound = Box<dyn SoundService<SoundType = Alarm> + Send + Sync>;
-type View = Box<
-    dyn for<'a, 'b> StatefulViewRef<Canvas<'a, 'b>, State = TuiState, Result = ()> + Send + Sync,
->;
+type Sound = Box<dyn SoundService<SoundType = Alarm>>;
+type View = Box<dyn for<'a, 'b> StatefulViewRef<Canvas<'a, 'b>, State = TuiState, Result = ()>>;
+type Repo = Box<dyn Repos>;
 
 pub struct TuiRunner {
     state: TuiState,
+
     redraw: bool,
+    active_session: Option<Session>,
 
     terminal: Tui,
     view: View,
 
     sound: Sound,
     tick: TickTimer,
+    repo: Repo,
 }
 
 impl Runner for TuiRunner {
@@ -49,7 +55,13 @@ impl Runner for TuiRunner {
 }
 
 impl TuiRunner {
-    pub fn new(pomo: Pomodoro, conf: Config, view: View, sound: Sound) -> Result<Self, TuiError> {
+    pub fn new(
+        pomo: Pomodoro,
+        conf: Config,
+        view: View,
+        sound: Sound,
+        repo: Repo,
+    ) -> Result<Self, TuiError> {
         let terminal = Tui::new()?;
 
         let state = TuiState::new(
@@ -61,11 +73,13 @@ impl TuiRunner {
 
         Ok(Self {
             state,
+            redraw: true,
+            active_session: None,
             terminal,
             view,
             sound,
             tick: TickTimer::default(),
-            redraw: true,
+            repo,
         })
     }
 
@@ -96,6 +110,7 @@ impl TuiRunner {
 
     fn tick(&mut self) {
         if self.tick.new_tick() {
+            self.session_tick();
             self.state.toast.tick();
             self.update_pomo(PomodoroMsg::Tick);
             self.redraw();
@@ -120,6 +135,7 @@ impl TuiRunner {
 
 impl TuiRunner {
     fn on_session_end(&mut self) {
+        self.session_stop();
         self.run_hooks();
         self.play_sound();
         self.send_notification();
@@ -301,8 +317,10 @@ impl TuiRunner {
     fn handle_pomodoro_cmd(&mut self, cmd: PomodoroCmd) {
         use PomodoroCmd::*;
         match cmd {
-            Started => {},
-            StartedPaused => {},
+            Started => {
+                self.session_new();
+            }
+            StartedPaused => {}
             SessionEnd => {
                 if self.should_auto_next() {
                     self.on_session_end();
@@ -315,10 +333,19 @@ impl TuiRunner {
                     self.update_timer(TimerMsg::SetPromptNextSession(true));
                 }
             }
-            NextSession => {}
-            SessionPaused => {}
-            SessionResumed => {}
-            SessionSkipped => {}
+            NextSession => {
+                self.session_new();
+            }
+            SessionPaused => {
+                self.session_stop();
+            }
+            SessionResumed => {
+                self.session_new();
+            }
+            SessionSkipped => {
+                self.session_stop();
+                self.session_new();
+            }
         }
     }
 
@@ -481,6 +508,43 @@ impl TuiRunner {
 }
 
 // ---------------------------------------------------------
+//  ___ ___ ___ ___ ___ ___  _  _
+// / __| __/ __/ __|_ _/ _ \| \| |
+// \__ \ _|\__ \__ \| | (_) | .` |
+// |___/___|___/___/___\___/|_|\_|
+// ---------------------------------------------------------
+
+// TODO: Handle errs
+impl TuiRunner {
+    fn session_new(&mut self) {
+        if self.active_session.is_some() {
+            self.session_stop();
+        }
+        self.active_session = Some(
+            self.repo
+                .session()
+                .new_session(None, self.pomo().mode().into())
+                .unwrap(),
+        );
+        debug!("session: new: {:?}", self.active_session);
+    }
+
+    fn session_tick(&self) {
+        if let Some(ses) = &self.active_session {
+            debug!("session: update: id={}", ses.id);
+            let _ = self.repo.session().update(ses.id);
+        }
+    }
+
+    fn session_stop(&mut self) {
+        if let Some(ses) = self.active_session.take() {
+            debug!("session: stop: id={}", ses.id);
+            let _ = self.repo.session().end_session(ses.id);
+        }
+    }
+}
+
+// ---------------------------------------------------------
 //  _____ ___ ___ _  __
 // |_   _|_ _/ __| |/ /
 //   | |  | | (__| ' <
@@ -528,6 +592,16 @@ impl From<ToastType> for ToasterType {
             ToastType::Error => ToasterType::Error,
             ToastType::Warning => ToasterType::Warning,
             ToastType::Success => ToasterType::Success,
+        }
+    }
+}
+
+impl From<Mode> for PomodoroState {
+    fn from(value: Mode) -> Self {
+        match value {
+            Mode::Focus => Self::Focus,
+            Mode::LongBreak => Self::LongBreak,
+            Mode::ShortBreak => Self::ShortBreak,
         }
     }
 }
