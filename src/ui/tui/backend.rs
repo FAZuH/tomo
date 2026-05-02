@@ -20,10 +20,12 @@ pub struct Tui {
 impl Tui {
     pub fn new() -> Result<Self, TuiError> {
         let terminal = Self::init()?;
+        Self::set_panic_hook();
         Ok(Self { terminal })
     }
 
     fn init() -> Result<Terminal<CrosstermBackend<Stderr>>, TuiError> {
+        color_eyre::install().map_err(|e| TuiError::InitializeError(e.to_string()))?;
         let buffer = std::io::stderr();
         let mut backend = CrosstermBackend::new(buffer);
 
@@ -36,12 +38,17 @@ impl Tui {
         Ok(terminal)
     }
 
-    fn cleanup(&mut self) -> Result<(), TuiError> {
-        execute!(self.terminal.backend_mut(), LeaveAlternateScreen)?;
-        execute!(self.terminal.backend_mut(), DisableMouseCapture)?;
+    fn cleanup() {
+        let _ = execute!(std::io::stderr(), LeaveAlternateScreen, DisableMouseCapture,);
+        let _ = crossterm::terminal::disable_raw_mode();
+    }
 
-        crossterm::terminal::disable_raw_mode()?;
-        Ok(())
+    fn set_panic_hook() {
+        let hook = std::panic::take_hook();
+        std::panic::set_hook(Box::new(move |info| {
+            Self::cleanup();
+            hook(info);
+        }));
     }
 }
 
@@ -61,6 +68,6 @@ impl DerefMut for Tui {
 
 impl Drop for Tui {
     fn drop(&mut self) {
-        self.cleanup().unwrap();
+        Self::cleanup();
     }
 }
