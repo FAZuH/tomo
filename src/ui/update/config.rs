@@ -12,8 +12,8 @@ use strum::IntoStaticStr;
 use strum::VariantArray;
 
 use crate::config::Config;
-use crate::config::Percentage;
 use crate::config::PomodoroConfig;
+use crate::config::Volume;
 use crate::ui::prelude::*;
 
 #[derive(
@@ -157,7 +157,7 @@ pub enum ConfigMsg {
             type = "percentage"
         )
     )]
-    AlarmVolumeFocus(Percentage),
+    AlarmVolumeFocus(Volume),
     #[strum(
         message = "Short Break",
         detailed_message = "Short Break Alarm Volume",
@@ -166,7 +166,7 @@ pub enum ConfigMsg {
             type = "percentage"
         )
     )]
-    AlarmVolumeShort(Percentage),
+    AlarmVolumeShort(Volume),
     #[strum(
         message = "Long Break",
         detailed_message = "Long Break Alarm Volume",
@@ -175,7 +175,7 @@ pub enum ConfigMsg {
             type = "percentage"
         )
     )]
-    AlarmVolumeLong(Percentage),
+    AlarmVolumeLong(Volume),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

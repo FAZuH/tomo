@@ -76,9 +76,9 @@ impl Config {
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, PartialOrd)]
-pub struct Percentage(f32);
+pub struct Volume(f32);
 
-impl Percentage {
+impl Volume {
     pub fn new(perc: f32) -> Self {
         let mut _self = Self::muted();
         _self.set_clamp(perc);
@@ -105,26 +105,26 @@ impl Percentage {
         Self(1.0)
     }
 
-    pub fn volume(&self) -> f32 {
+    pub fn value(&self) -> f32 {
         self.0
     }
 }
 
-impl Default for Percentage {
+impl Default for Volume {
     fn default() -> Self {
         Self::half()
     }
 }
 
-impl TryFrom<&str> for Percentage {
+impl TryFrom<&str> for Volume {
     type Error = std::num::ParseIntError;
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         let f: i32 = value.to_string().parse()?;
-        Ok(Percentage::new(f as f32 / 100.0))
+        Ok(Volume::new(f as f32 / 100.0))
     }
 }
 
-impl std::fmt::Display for Percentage {
+impl std::fmt::Display for Volume {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:.0}%", self.0 * 100.0)
     }
@@ -222,7 +222,7 @@ pub struct Alarms {
 #[serde(default)]
 pub struct Alarm {
     pub path: Option<PathBuf>,
-    pub volume: crate::config::Percentage,
+    pub volume: crate::config::Volume,
 }
 
 impl Alarm {
@@ -246,56 +246,56 @@ mod tests {
 
     #[test]
     fn percentage_clamps_above() {
-        assert_eq!(Percentage::new(1.5).volume(), 1.0);
+        assert_eq!(Volume::new(1.5).value(), 1.0);
     }
 
     #[test]
     fn percentage_clamps_below() {
-        assert_eq!(Percentage::new(-0.5).volume(), 0.0);
+        assert_eq!(Volume::new(-0.5).value(), 0.0);
     }
 
     #[test]
     fn percentage_new_in_range() {
-        assert_eq!(Percentage::new(0.75).volume(), 0.75);
+        assert_eq!(Volume::new(0.75).value(), 0.75);
     }
 
     #[test]
     fn percentage_try_from_str() {
-        assert_eq!(Percentage::try_from("50").unwrap().volume(), 0.5);
-        assert_eq!(Percentage::try_from("100").unwrap().volume(), 1.0);
+        assert_eq!(Volume::try_from("50").unwrap().value(), 0.5);
+        assert_eq!(Volume::try_from("100").unwrap().value(), 1.0);
     }
 
     #[test]
     fn percentage_try_from_str_invalid() {
-        assert!(Percentage::try_from("abc").is_err());
+        assert!(Volume::try_from("abc").is_err());
     }
 
     #[test]
     fn percentage_display() {
-        assert_eq!(Percentage::new(0.5).to_string(), "50%");
-        assert_eq!(Percentage::new(1.0).to_string(), "100%");
-        assert_eq!(Percentage::new(0.0).to_string(), "0%");
+        assert_eq!(Volume::new(0.5).to_string(), "50%");
+        assert_eq!(Volume::new(1.0).to_string(), "100%");
+        assert_eq!(Volume::new(0.0).to_string(), "0%");
     }
 
     #[test]
     fn percentage_default() {
-        let p = Percentage::default();
-        assert_eq!(p.volume(), 0.5);
+        let p = Volume::default();
+        assert_eq!(p.value(), 0.5);
     }
 
     #[test]
     fn percentage_full() {
-        assert_eq!(Percentage::full().volume(), 1.0);
+        assert_eq!(Volume::full().value(), 1.0);
     }
 
     #[test]
     fn percentage_muted() {
-        assert_eq!(Percentage::muted().volume(), 0.0);
+        assert_eq!(Volume::muted().value(), 0.0);
     }
 
     #[test]
     fn percentage_half() {
-        assert_eq!(Percentage::half().volume(), 0.5);
+        assert_eq!(Volume::half().value(), 0.5);
     }
 
     #[test]

@@ -46,7 +46,7 @@ impl SoundService for AlarmService {
 
             let mixer = DeviceSinkBuilder::open_default_sink()?;
             let player = Player::connect_new(mixer.mixer());
-            player.set_volume(state.volume.volume());
+            player.set_volume(state.volume.value());
             player.append(decoder);
             player.play();
 
