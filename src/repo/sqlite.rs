@@ -17,17 +17,12 @@ use crate::model::Mode;
 use crate::model::Session;
 use crate::model::Task;
 use crate::repo::MIGRATIONS;
-use crate::repo::ProjectRepo;
-use crate::repo::Repos;
-use crate::repo::SessionRepo;
-use crate::repo::TagRepo;
-use crate::repo::TaskRepo;
 use crate::repo::error::RepoError;
-use crate::repo::model::TaskRow;
 use crate::repo::model::*;
+use crate::repo::traits::*;
 
 type SqlitePool = Pool<ConnectionManager<SqliteConnection>>;
-type RepoResult<T> = Result<T, Box<dyn Error + Send + Sync>>;
+type RepoResult<T> = Result<T, RepoError>;
 
 pub struct SqliteRepos {
     db: SqliteDb,

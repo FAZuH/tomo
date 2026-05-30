@@ -1,8 +1,10 @@
 use crate::model::Mode;
 use crate::model::Session;
 use crate::model::Task;
+use crate::repo::RepoError;
 
-type RepoResult<T> = Result<T, Box<dyn std::error::Error + Send + Sync>>;
+pub type RepoResult<T> = Result<T, RepoError>;
+
 pub trait ProjectRepo {}
 
 pub trait TagRepo {}

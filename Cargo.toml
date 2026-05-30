@@ -25,6 +25,7 @@ fd-lock = "4.0.4"
 figlet-rs = "1.0.0"
 log = "0.4.29"
 notify-rust = "4.16.0"
+r2d2 = "0.8.10"
 ratatui = "0.30.0"
 ratatui-toaster = { path = "./crates/ratatui-toaster" }
 rodio = { version = "0.22.2", features = ["tracing"] }

@@ -3265,6 +3265,7 @@ dependencies = [
  "figlet-rs",
  "log",
  "notify-rust",
+ "r2d2",
  "ratatui",
  "ratatui-toaster",
  "rodio",
