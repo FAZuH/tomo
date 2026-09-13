@@ -1,4 +1,10 @@
+<div align="center">
+
+# tomo
+
 **A TUI-based Pomodoro timer to help you stay focused and productive.**
+
+</div>
 
 <hr>
 
